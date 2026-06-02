@@ -125,24 +125,30 @@ export default function SmsPage() {
     }
 
     const results = await sendBulkSms(recipients, message, senderId)
+    const successCount = results.filter((r) => r.success).length
 
-    const smsRecords = results.map((r, i) => ({
-      company_id: profile.company_id,
-      sender_id: senderId,
-      recipient: recipients[i],
-      message,
-      status: r.success ? "sent" : "failed",
-      credits_cost: 1,
-      sent_at: r.success ? new Date().toISOString() : null,
-    }))
+    await sb.from("sms_messages").insert(
+      results.map((r, i) => ({
+        company_id: profile.company_id,
+        sender_id: senderId,
+        recipient: recipients[i],
+        message,
+        status: r.success ? "sent" : "failed",
+        credits_cost: 1,
+        sent_at: r.success ? new Date().toISOString() : null,
+      }))
+    )
 
-    const successCount = smsRecords.filter((r) => r.status === "sent").length
+    const { data: deducted } = await sb.rpc("deduct_sms_credits", {
+      p_company_id: profile.company_id,
+      p_amount: recipients.length,
+    })
 
-    await sb.from("sms_messages").insert(smsRecords)
-    await sb
-      .from("sms_credits")
-      .update({ balance: credits.balance - recipients.length })
-      .eq("company_id", profile.company_id)
+    if (deducted === false) {
+      toast.error("Kredi düşülemedi! Admin ile iletişime geçin.")
+      setLoading(false)
+      return
+    }
 
     await sb.from("credit_transactions").insert({
       company_id: profile.company_id,
