@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import "./globals.css"
-import { ToastContainer } from "@/components/ui/toast"
+import { Toaster } from "react-hot-toast"
 
 export const metadata: Metadata = {
   title: "Msgnex - B2B Toplu SMS Platformu",
@@ -14,9 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <body className="min-h-screen bg-gray-50 antialiased">
+      <body>
         {children}
-        <ToastContainer />
+        <Toaster position="top-right" />
       </body>
     </html>
   )

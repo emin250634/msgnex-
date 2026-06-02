@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { showToast } from "@/components/ui/toast"
+import toast from "react-hot-toast"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -77,7 +77,7 @@ export default function RegisterPage() {
           .insert({ company_id: companyRes.data.id, balance: 100 })
       }
 
-      showToast("Hesabınız oluşturuldu! Hoş geldiniz.", "success")
+      toast.success("Hesabınız oluşturuldu! Hoş geldiniz.")
 
       const { data: profile } = await supabase
         .from("profiles")

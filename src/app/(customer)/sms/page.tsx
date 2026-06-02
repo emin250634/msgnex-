@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { sendBulkSms } from "@/services/sms-provider"
-import { showToast } from "@/components/ui/toast"
+import toast from "react-hot-toast"
 import type { Contact, Group } from "@/types"
 
 export default function SmsPage() {
@@ -36,7 +36,7 @@ export default function SmsPage() {
 
     const recipients = getRecipients()
     if (recipients.length === 0) {
-      showToast("Gönderilecek kişi bulunamadı", "error")
+      toast.error("Gönderilecek kişi bulunamadı")
       setLoading(false)
       return
     }
@@ -44,7 +44,7 @@ export default function SmsPage() {
     const supabase = createClient()
     const { data: profile } = await supabase.from("profiles").select("company_id").single()
     if (!profile?.company_id) {
-      showToast("Firma bilgisi bulunamadı", "error")
+      toast.error("Firma bilgisi bulunamadı")
       setLoading(false)
       return
     }
@@ -56,7 +56,7 @@ export default function SmsPage() {
       .single()
 
     if (!credits || credits.balance < recipients.length) {
-      showToast("Yetersiz bakiye!", "error")
+      toast.error("Yetersiz bakiye!")
       setLoading(false)
       return
     }
@@ -93,7 +93,7 @@ export default function SmsPage() {
       fail: recipients.length - successCount,
     })
 
-    showToast(`SMS gönderildi! ${successCount} başarılı, ${recipients.length - successCount} hata`, "success")
+    toast.success(`SMS gönderildi! ${successCount} başarılı, ${recipients.length - successCount} hata`)
     setLoading(false)
   }
 

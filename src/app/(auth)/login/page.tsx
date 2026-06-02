@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { loginSchema, type LoginInput } from "@/lib/validations/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { showToast } from "@/components/ui/toast"
+import toast from "react-hot-toast"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -46,7 +46,7 @@ export default function LoginPage() {
         ? "E-posta veya şifre hatalı"
         : error.message
       setApiError(msg)
-      showToast(msg, "error")
+      toast.error(msg)
       return
     }
 
@@ -59,7 +59,7 @@ export default function LoginPage() {
       .eq("id", user.id)
       .single()
 
-    showToast("Giriş başarılı!", "success")
+    toast.success("Giriş başarılı!")
     router.push(profile?.role === "admin" ? "/admin/dashboard" : "/dashboard")
     router.refresh()
   }
