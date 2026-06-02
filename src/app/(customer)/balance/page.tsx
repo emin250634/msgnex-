@@ -14,14 +14,14 @@ export default function BalancePage() {
   useEffect(() => {
     const supabase = createClient()
     const load = async () => {
-      const { data: profile } = await supabase.from("profiles").select("company_id").single()
+      const { data: profile } = await supabase.from("profiles").select("company_id").maybeSingle()
       if (!profile?.company_id) { setLoading(false); return }
 
       const { data: creditData } = await supabase
         .from("sms_credits")
         .select("*")
         .eq("company_id", profile.company_id)
-        .single()
+        .maybeSingle()
       setCredits(creditData)
 
       const { data: txData } = await supabase

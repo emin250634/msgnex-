@@ -62,7 +62,7 @@ export default function RegisterPage() {
     if (data.user) {
       const companyRes = await supabase
         .from("companies")
-        .insert({ name: form.company_name })
+        .insert({ name: form.company_name, sender_name: form.company_name })
         .select()
         .single()
 

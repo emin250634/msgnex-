@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
+import toast from "react-hot-toast"
 import type { Company, SmsCredit } from "@/types"
 
 export default function CompaniesPage() {
@@ -40,13 +41,27 @@ export default function CompaniesPage() {
     load()
   }
 
+  const handleApproveSender = async (id: string) => {
+    const supabase = createClient()
+    await supabase.from("companies").update({ sender_approved: true }).eq("id", id)
+    toast.success("SMS başlığı onaylandı")
+    load()
+  }
+
+  const handleUpdateSender = async (id: string, name: string) => {
+    const supabase = createClient()
+    await supabase.from("companies").update({ sender_name: name, sender_approved: false }).eq("id", id)
+    toast.success("SMS başlığı güncellendi, tekrar onay gerekli")
+    load()
+  }
+
   if (loading) return <p>Yükleniyor...</p>
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Firma Yönetimi</h1>
 
-      <Card>
+      <Card title="Yeni Firma Ekle">
         <div className="flex gap-3">
           <Input
             placeholder="Firma adı"
@@ -57,13 +72,13 @@ export default function CompaniesPage() {
         </div>
       </Card>
 
-      <Card>
+      <Card title="Firmalar">
         <Table>
           <THead>
             <Tr>
               <Th>Firma</Th>
-              <Th>Vergi No</Th>
-              <Th>Telefon</Th>
+              <Th>SMS Başlığı</Th>
+              <Th>Başlık Onayı</Th>
               <Th>Kredi</Th>
               <Th>Durum</Th>
             </Tr>
@@ -72,9 +87,27 @@ export default function CompaniesPage() {
             {companies.map((c) => (
               <Tr key={c.id}>
                 <Td className="font-medium">{c.name}</Td>
-                <Td>{c.tax_no || "-"}</Td>
-                <Td>{c.phone || "-"}</Td>
-                <Td>{credits[c.id] ?? 0}</Td>
+                <Td>
+                  <span className="text-sm font-mono bg-gray-100 px-2 py-0.5 rounded">
+                    {c.sender_name || "Ayarlanmamış"}
+                  </span>
+                </Td>
+                <Td>
+                  {c.sender_name ? (
+                    c.sender_approved ? (
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-green-100 text-green-700">
+                        Onaylı
+                      </span>
+                    ) : (
+                      <Button size="sm" onClick={() => handleApproveSender(c.id)}>
+                        Onayla
+                      </Button>
+                    )
+                  ) : (
+                    <span className="text-xs text-gray-400">-</span>
+                  )}
+                </Td>
+                <Td><span className="font-bold text-primary-600">{credits[c.id] ?? 0}</span></Td>
                 <Td>
                   <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                     c.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"

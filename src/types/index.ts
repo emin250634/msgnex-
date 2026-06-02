@@ -18,6 +18,8 @@ export interface Company {
   phone: string | null
   address: string | null
   is_active: boolean
+  sender_name: string
+  sender_approved: boolean
   created_at: string
   updated_at: string
 }
@@ -85,6 +87,15 @@ export interface SmsCampaign {
   status: "draft" | "scheduled" | "sending" | "completed" | "failed"
   scheduled_at: string | null
   sent_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SmsTemplate {
+  id: string
+  company_id: string
+  name: string
+  message: string
   created_at: string
   updated_at: string
 }

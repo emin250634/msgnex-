@@ -16,6 +16,7 @@ const customerNav: NavItem[] = [
   { label: "Kişiler", href: "/contacts", icon: "👤" },
   { label: "Gruplar", href: "/groups", icon: "📁" },
   { label: "SMS Gönder", href: "/sms", icon: "✉️" },
+  { label: "Şablonlar", href: "/templates", icon: "📝" },
   { label: "Gönderim Geçmişi", href: "/history", icon: "📋" },
   { label: "Bakiye", href: "/balance", icon: "💰" },
 ]

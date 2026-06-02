@@ -130,7 +130,7 @@ export default async function CustomerDashboard() {
               </svg>
               <p className="mt-3 text-sm text-gray-500">Henüz SMS gönderimi yapılmamış.</p>
               <Link href="/sms">
-                <Button className="mt-4" size="sm">İlk SMS'i Gönder</Button>
+                <Button className="mt-4" size="sm">İlk SMS&rsquo;i Gönder</Button>
               </Link>
             </div>
           )}

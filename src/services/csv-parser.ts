@@ -8,11 +8,11 @@ export interface CsvParseResult {
 }
 
 export function parseContactCsv(content: string): CsvParseResult {
-  const result = Papa.parse<Record<string, string>>(content, {
+  const result = (Papa as any).parse(content, {
     header: true,
     skipEmptyLines: true,
     encoding: "utf-8",
-  })
+  }) as Papa.ParseResult<Record<string, string>>
 
   const errors: { row: number; message: string }[] = []
   const data: CsvContactRow[] = []
