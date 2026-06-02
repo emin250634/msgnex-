@@ -1,0 +1,2 @@
+-- Legacy compatibility migration.
+-- The sms_templates table is created by 00000_clean_setup.sql.

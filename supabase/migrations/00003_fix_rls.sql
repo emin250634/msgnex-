@@ -1,0 +1,2 @@
+-- Legacy compatibility migration.
+-- RLS helpers and policies are created by 00000_clean_setup.sql.

@@ -1,0 +1,2 @@
+-- Legacy compatibility migration.
+-- Credit reservation is implemented by 00006_secure_dispatch.sql.
