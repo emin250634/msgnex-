@@ -18,7 +18,7 @@ export default function LogsPage() {
         .select("*")
         .order("created_at", { ascending: false })
 
-      const companyIds = [...new Set(messages?.map((m) => m.company_id) || [])]
+      const companyIds = Array.from(new Set((messages ?? []).map((m) => m.company_id).filter(Boolean)))
       const { data: companies } = await supabase
         .from("companies")
         .select("id, name")

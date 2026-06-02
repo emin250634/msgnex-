@@ -34,34 +34,32 @@ export default function LoginPage() {
     const supabase = createClient()
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
     })
 
     setLoading(false)
 
-    if (error) {
-      const msg = error.message === "Invalid login credentials"
+    if (error || !data.user) {
+      const msg = error?.message === "Invalid login credentials"
         ? "E-posta veya şifre hatalı"
-        : error.message
+        : error?.message || "Giriş yapılamadı"
       setApiError(msg)
       toast.error(msg)
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
-      .eq("id", user.id)
+      .eq("id", data.user.id)
       .single()
 
     toast.success("Giriş başarılı!")
-    router.push(profile?.role === "admin" ? "/admin/dashboard" : "/dashboard")
-    router.refresh()
+
+    const target = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard"
+    window.location.href = target
   }
 
   return (
