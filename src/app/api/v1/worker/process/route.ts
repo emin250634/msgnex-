@@ -67,8 +67,14 @@ export async function POST(request: Request) {
     const results = providerResults.map((result, resultIndex) => ({
       id: campaign.messages[resultIndex].id,
       success: result.success,
+      accepted: result.accepted ?? result.success,
+      provider_name: result.providerName ?? null,
+      provider_bulk_id: result.providerBulkId ?? null,
       provider_message_id: result.messageId,
+      provider_status_code: result.providerStatusCode ?? null,
+      provider_status_text: result.providerStatusText ?? null,
       error: result.error ?? null,
+      raw_status: result.rawStatus ?? null,
     }))
 
     const { data: completed, error: completionError } = await supabase.rpc(

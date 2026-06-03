@@ -16,6 +16,12 @@ export interface SendSmsResult {
   success: boolean
   messageId: string | null
   error?: string
+  accepted?: boolean
+  providerName?: string
+  providerBulkId?: string | null
+  providerStatusCode?: string | null
+  providerStatusText?: string | null
+  rawStatus?: unknown
 }
 
 export interface SmsProvider {
@@ -83,6 +89,261 @@ class FakeSmsProvider implements SmsProvider {
   }
 }
 
+class NetgsmProvider implements SmsProvider {
+  private readonly endpoint: string
+  private readonly userCode: string
+  private readonly password: string
+  private readonly defaultHeader: string | null
+  private readonly appKey: string | null
+  private readonly encoding: string
+  private readonly timeoutMs: number
+
+  constructor() {
+    this.endpoint =
+      process.env.NETGSM_ENDPOINT || "https://api.netgsm.com.tr/sms/send/xml"
+    this.userCode = process.env.NETGSM_USERCODE || ""
+    this.password = process.env.NETGSM_PASSWORD || ""
+    this.defaultHeader = process.env.NETGSM_HEADER || null
+    this.appKey = process.env.NETGSM_APPKEY || null
+    this.encoding = process.env.NETGSM_ENCODING || "TR"
+    this.timeoutMs = Number(process.env.SMS_PROVIDER_TIMEOUT_MS || 15000)
+
+    if (!this.userCode || !this.password) {
+      throw new Error("NETGSM_USERCODE ve NETGSM_PASSWORD tanimli degil")
+    }
+  }
+
+  async sendSms(params: SendSmsParams): Promise<SendSmsResult> {
+    const [result] = await this.sendBulkSms(
+      [params.recipient],
+      params.message,
+      params.senderId
+    )
+    return result
+  }
+
+  async sendBulkSms(
+    recipients: string[],
+    message: string,
+    senderId: string
+  ): Promise<SendSmsResult[]> {
+    const normalizedRecipients = recipients.map((recipient) =>
+      this.normalizeRecipient(recipient)
+    )
+    const invalidRecipient = normalizedRecipients.find(
+      (recipient) => !/^5\d{9}$/.test(recipient)
+    )
+
+    if (invalidRecipient) {
+      return recipients.map((recipient) => ({
+        success: false,
+        accepted: false,
+        messageId: null,
+        providerName: "netgsm",
+        providerBulkId: null,
+        providerStatusCode: "INVALID_RECIPIENT",
+        providerStatusText: "Gecersiz Netgsm alici formati",
+        error: `Gecersiz telefon numarasi: ${recipient}`,
+      }))
+    }
+
+    if (!message.trim()) {
+      return recipients.map(() => ({
+        success: false,
+        accepted: false,
+        messageId: null,
+        providerName: "netgsm",
+        providerBulkId: null,
+        providerStatusCode: "INVALID_MESSAGE",
+        providerStatusText: "Mesaj icerigi bos olamaz",
+        error: "Mesaj icerigi bos olamaz",
+      }))
+    }
+
+    const sender = (senderId || this.defaultHeader || "").trim()
+    if (sender.length < 3 || sender.length > 11) {
+      return recipients.map(() => ({
+        success: false,
+        accepted: false,
+        messageId: null,
+        providerName: "netgsm",
+        providerBulkId: null,
+        providerStatusCode: "INVALID_SENDER",
+        providerStatusText: "Netgsm basligi 3-11 karakter olmalidir",
+        error: "Netgsm basligi 3-11 karakter olmalidir",
+      }))
+    }
+
+    const payload = this.buildXmlPayload(normalizedRecipients, message, sender)
+    let rawResponse = ""
+
+    try {
+      rawResponse = await this.postXml(payload)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Netgsm istegi tamamlanamadi"
+      return recipients.map(() => ({
+        success: false,
+        accepted: false,
+        messageId: null,
+        providerName: "netgsm",
+        providerBulkId: null,
+        providerStatusCode: "PROVIDER_REQUEST_FAILED",
+        providerStatusText: message,
+        error: message,
+      }))
+    }
+
+    const parsed = this.parseResponse(rawResponse)
+    if (!parsed.success) {
+      return recipients.map(() => ({
+        success: false,
+        accepted: false,
+        messageId: null,
+        providerName: "netgsm",
+        providerBulkId: parsed.bulkId,
+        providerStatusCode: parsed.code,
+        providerStatusText: parsed.message,
+        error: parsed.message,
+        rawStatus: rawResponse,
+      }))
+    }
+
+    return recipients.map((recipient, index) => ({
+      success: true,
+      accepted: true,
+      messageId: `${parsed.bulkId}:${index}`,
+      providerName: "netgsm",
+      providerBulkId: parsed.bulkId,
+      providerStatusCode: parsed.code,
+      providerStatusText: parsed.message,
+      rawStatus: rawResponse,
+    }))
+  }
+
+  private normalizeRecipient(recipient: string): string {
+    const digits = recipient.replace(/\D/g, "")
+    if (digits.length === 12 && digits.startsWith("90")) return digits.slice(2)
+    if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1)
+    return digits
+  }
+
+  private buildXmlPayload(
+    recipients: string[],
+    message: string,
+    senderId: string
+  ): string {
+    const numbers = recipients.map((recipient) => `<no>${recipient}</no>`).join("")
+    const appKey = this.appKey ? `<appkey>${this.escapeXml(this.appKey)}</appkey>` : ""
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<mainbody>
+  <header>
+    <company dil="${this.escapeXml(this.encoding)}">Netgsm</company>
+    <usercode>${this.escapeXml(this.userCode)}</usercode>
+    <password>${this.escapeXml(this.password)}</password>
+    ${appKey}
+    <type>1:n</type>
+    <msgheader>${this.escapeXml(senderId)}</msgheader>
+  </header>
+  <body>
+    <msg><![CDATA[${this.escapeCdata(message)}]]></msg>
+    ${numbers}
+  </body>
+</mainbody>`
+  }
+
+  private async postXml(payload: string): Promise<string> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
+
+    try {
+      const response = await fetch(this.endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/xml; charset=utf-8",
+        },
+        body: payload,
+        signal: controller.signal,
+      })
+
+      const text = await response.text()
+      if (!response.ok) {
+        throw new Error(`Netgsm HTTP ${response.status}: ${text || response.statusText}`)
+      }
+
+      return text
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  private parseResponse(rawResponse: string): {
+    success: boolean
+    code: string
+    bulkId: string | null
+    message: string
+  } {
+    const trimmed = rawResponse.trim()
+    const code =
+      this.matchXmlValue(trimmed, "code") ||
+      trimmed.match(/^(\d{2,3})(?:\s+|$)/)?.[1] ||
+      "UNKNOWN"
+    const bulkId =
+      this.matchXmlValue(trimmed, "jobID") ||
+      this.matchXmlValue(trimmed, "jobid") ||
+      this.matchXmlValue(trimmed, "bulkID") ||
+      this.matchXmlValue(trimmed, "bulkid") ||
+      trimmed.match(/^(?:00|0)\s+([A-Za-z0-9_-]+)/)?.[1] ||
+      null
+
+    const success = (code === "00" || code === "0") && Boolean(bulkId)
+    return {
+      success,
+      code,
+      bulkId,
+      message: success ? "Netgsm tarafindan kabul edildi" : this.errorMessage(code, trimmed),
+    }
+  }
+
+  private matchXmlValue(value: string, tagName: string): string | null {
+    const match = value.match(new RegExp(`<${tagName}>(.*?)</${tagName}>`, "i"))
+    return match?.[1]?.trim() || null
+  }
+
+  private errorMessage(code: string, rawResponse: string): string {
+    const messages: Record<string, string> = {
+      "20": "Mesaj metni veya mesaj boyu gecersiz",
+      "30": "Gecersiz Netgsm kullanici bilgisi veya API yetkisi",
+      "40": "Gecersiz Netgsm mesaj basligi",
+      "41": "Gecersiz Netgsm mesaj basligi",
+      "50": "Gecersiz alici numarasi",
+      "51": "Gecersiz alici numarasi",
+      "52": "Gecersiz alici numarasi",
+      "60": "Netgsm hesap paketi uygun degil",
+      "70": "Netgsm input parametreleri gecersiz",
+      "100": "Netgsm sistem hatasi",
+    }
+
+    return messages[code] || `Netgsm hatasi (${code}): ${rawResponse}`
+  }
+
+  private escapeXml(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;")
+  }
+
+  private escapeCdata(value: string): string {
+    return value.replace(/\]\]>/g, "]]]]><![CDATA[>")
+  }
+}
+
 export function createSmsProvider(): SmsProvider {
+  const provider = (process.env.SMS_PROVIDER || "fake").toLowerCase()
+  if (provider === "netgsm") return new NetgsmProvider()
   return new FakeSmsProvider()
 }
