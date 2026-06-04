@@ -7,6 +7,7 @@ interface StatCardProps {
   description?: string
   icon?: ReactNode
   tone?: "blue" | "emerald" | "amber" | "rose" | "slate"
+  trend?: ReactNode
   className?: string
 }
 
@@ -24,22 +25,24 @@ export function StatCard({
   description,
   icon,
   tone = "slate",
+  trend,
   className,
 }: StatCardProps) {
   return (
-    <div className={cn("rounded-lg border border-gray-200 bg-white p-5 shadow-sm", className)}>
+    <div className={cn("relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md", className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <div className="mt-2 text-2xl font-semibold text-gray-950">{value}</div>
+          <p className="text-[15px] font-semibold text-gray-600">{title}</p>
+          <div className="mt-3 text-4xl font-semibold tracking-tight text-gray-950">{value}</div>
         </div>
         {icon && (
-          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1", tones[tone])}>
+          <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-base ring-1", tones[tone])}>
             {icon}
           </div>
         )}
       </div>
-      {description && <p className="mt-2 text-sm text-gray-500">{description}</p>}
+      {description && <p className="mt-4 text-sm leading-5 text-gray-500">{description}</p>}
+      {trend && <div className="mt-5">{trend}</div>}
     </div>
   )
 }

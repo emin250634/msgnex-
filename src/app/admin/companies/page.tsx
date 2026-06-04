@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import toast from "react-hot-toast"
 import type { Company, SmsCredit } from "@/types"
@@ -90,7 +91,10 @@ export default function CompaniesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Firma Yönetimi</h1>
+      <PageHeader
+        title="Firma Yönetimi"
+        description="Müşteri firmalarını, sender başlıklarını ve kredi durumlarını yönetin."
+      />
 
       <Card title="Yeni Firma Ekle">
         <div className="flex gap-3">

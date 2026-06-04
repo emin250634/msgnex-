@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import type { Group } from "@/types"
 
@@ -65,9 +66,12 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Gruplar</h1>
+      <PageHeader
+        title="Gruplar"
+        description="Alıcı segmentlerinizi yönetin ve kampanya hedef kitlenizi düzenleyin."
+      />
 
-      <Card title="Yeni Grup">
+      <Card title="Grup Oluştur">
         <div className="flex gap-3">
           <Input
             placeholder="Grup adı"

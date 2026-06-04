@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import toast from "react-hot-toast"
 import type { CustomerApiKey } from "@/types"
@@ -82,10 +83,10 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">API Anahtarları</h1>
-        <p className="text-sm text-gray-500">Kendi yazılımınızdan işlemsel SMS göndermek için anahtar oluşturun.</p>
-      </div>
+      <PageHeader
+        title="API Anahtarları"
+        description="Kendi yazılımınızdan işlemsel SMS göndermek için güvenli API anahtarları oluşturun."
+      />
 
       {createdKey && (
         <Card title="Yeni API Anahtarınız">

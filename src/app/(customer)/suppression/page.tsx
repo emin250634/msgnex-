@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import { parseSuppressionCsv } from "@/services/suppression-csv-parser"
 import toast from "react-hot-toast"
@@ -73,10 +74,10 @@ export default function SuppressionPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Kara Liste</h1>
-        <p className="text-sm text-gray-500">SMS gönderilmemesi gereken numaraları yönetin.</p>
-      </div>
+      <PageHeader
+        title="Kara Liste"
+        description="SMS gönderilmemesi gereken numaraları yönetin ve toplu içe aktarım yapın."
+      />
       <Card title="Numara Ekle">
         <div className="space-y-3">
           <div className="grid gap-3 md:grid-cols-2">

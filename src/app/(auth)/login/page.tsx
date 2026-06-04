@@ -1,23 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { loginSchema, type LoginInput } from "@/lib/validations/auth"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import toast from "react-hot-toast"
 
 export default function LoginPage() {
-  const router = useRouter()
   const [form, setForm] = useState<LoginInput>({ email: "", password: "" })
   const [errors, setErrors] = useState<Partial<LoginInput>>({})
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState("")
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
     setApiError("")
 
     const result = loginSchema.safeParse(form)
@@ -42,11 +41,11 @@ export default function LoginPage() {
     setLoading(false)
 
     if (error || !data.user) {
-      const msg = error?.message === "Invalid login credentials"
+      const message = error?.message === "Invalid login credentials"
         ? "E-posta veya şifre hatalı"
         : error?.message || "Giriş yapılamadı"
-      setApiError(msg)
-      toast.error(msg)
+      setApiError(message)
+      toast.error(message)
       return
     }
 
@@ -57,16 +56,20 @@ export default function LoginPage() {
       .single()
 
     toast.success("Giriş başarılı!")
-
-    const target = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard"
-    window.location.href = target
+    window.location.href = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard"
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-lg">
+    <div className="mx-auto w-full">
+      <div className="mb-10 flex justify-center">
+        <BrandLogo size="lg" className="max-w-[320px]" />
+      </div>
+
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Msgnex</h1>
-        <p className="mt-1 text-sm text-gray-500">Giriş yapın</p>
+        <h1 className="text-2xl font-semibold text-gray-950">Giriş yapın</h1>
+        <p className="mt-2 text-sm text-gray-500">
+          MSGNEX paneline erişmek için hesap bilgilerinizle devam edin.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -74,24 +77,28 @@ export default function LoginPage() {
           id="email"
           label="E-posta"
           type="email"
+          className="rounded-none border-x-0 border-t-0 border-blue-700 px-0 shadow-none focus:border-blue-800 focus:ring-0"
           value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
           error={errors.email}
         />
         <Input
           id="password"
           label="Şifre"
           type="password"
+          className="rounded-none border-x-0 border-t-0 border-blue-700 px-0 shadow-none focus:border-blue-800 focus:ring-0"
           value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          onChange={(event) => setForm({ ...form, password: event.target.value })}
           error={errors.password}
         />
 
         {apiError && (
-          <p className="text-sm text-red-600">{apiError}</p>
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {apiError}
+          </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="mt-2 w-full bg-blue-700 hover:bg-blue-800" disabled={loading}>
           {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
         </Button>
       </form>

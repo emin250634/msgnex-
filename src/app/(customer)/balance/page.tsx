@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import type { SmsCredit, CreditTransaction } from "@/types"
 
@@ -39,7 +40,10 @@ export default function BalancePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Bakiye</h1>
+      <PageHeader
+        title="Bakiye"
+        description="SMS kredi bakiyenizi ve tüm kredi hareketlerinizi takip edin."
+      />
 
       <Card title="SMS Kredi Bakiyesi">
         <p className="text-4xl font-bold text-primary-600">{credits?.balance ?? 0}</p>

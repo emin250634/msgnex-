@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import type { Profile } from "@/types"
 
@@ -31,7 +32,10 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Kullanıcılar</h1>
+      <PageHeader
+        title="Kullanıcılar"
+        description="Platform kullanıcılarını, rollerini ve firma bağlantılarını izleyin."
+      />
       <Card>
         <Table>
           <THead>

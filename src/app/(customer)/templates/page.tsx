@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import toast from "react-hot-toast"
 import type { SmsTemplate } from "@/types"
@@ -82,12 +83,15 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">SMS Şablonları</h1>
-        <Button onClick={() => { setShowForm(!showForm); setEditingId(null); setName(""); setMessage("") }}>
-          {showForm ? "Kapat" : "Yeni Şablon"}
-        </Button>
-      </div>
+      <PageHeader
+        title="SMS Şablonları"
+        description="Sık kullanılan mesaj içeriklerini yönetin ve kampanya hazırlığını hızlandırın."
+        actions={
+          <Button onClick={() => { setShowForm(!showForm); setEditingId(null); setName(""); setMessage("") }}>
+            {showForm ? "Kapat" : "Şablon Oluştur"}
+          </Button>
+        }
+      />
 
       {showForm && (
         <Card title={editingId ? "Şablon Düzenle" : "Yeni Şablon"}>

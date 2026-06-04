@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import type { Company } from "@/types"
 
@@ -30,7 +31,10 @@ export default function SuspensionPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Hesap Askıya Alma</h1>
+      <PageHeader
+        title="Hesap Askıya Alma"
+        description="Firma hesaplarını geçici olarak durdurun veya tekrar aktif hale getirin."
+      />
 
       <Card>
         <Table>

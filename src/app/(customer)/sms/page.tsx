@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { calculateSmsSegments, MAX_SMS_LENGTH } from "@/lib/sms-segments"
 import toast from "react-hot-toast"
 import type { Contact, Group, SmsTemplate } from "@/types"
@@ -126,13 +127,16 @@ export default function SmsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">SMS Gönder</h1>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Kalan Kredi</p>
-          <p className="text-xl font-bold text-primary-600">{balance}</p>
-        </div>
-      </div>
+      <PageHeader
+        title="SMS Gönder"
+        description="Alıcı seçimi, mesaj içeriği ve kredi özetini kontrol ederek kampanya oluşturun."
+        actions={
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-right">
+            <p className="text-xs font-medium text-blue-700">Kalan Kredi</p>
+            <p className="text-xl font-semibold text-blue-800">{balance}</p>
+          </div>
+        }
+      />
 
       <Card title="Şablon Seç">
         <div className="flex flex-wrap gap-2">

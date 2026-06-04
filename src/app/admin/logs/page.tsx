@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import toast from "react-hot-toast"
@@ -55,7 +56,10 @@ export default function LogsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Gönderim Kayıtları</h1>
+      <PageHeader
+        title="Gönderim Kayıtları"
+        description="Tüm firmaların SMS gönderim kayıtlarını ve durumlarını takip edin."
+      />
       <Card title="SMS Logları">
         <div className="mb-4">
           <Input

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import toast from "react-hot-toast"
 import type { Company, ProviderWallet } from "@/types"
@@ -104,10 +105,10 @@ export default function CreditsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Kredi Yönetimi</h1>
-        <p className="text-sm text-gray-500">Toptan SMS kredilerini kaydedin ve müşterilere dağıtın.</p>
-      </div>
+      <PageHeader
+        title="Kredi Yönetimi"
+        description="Toptan SMS kredilerini kaydedin, sağlayıcı havuzlarını ve müşteri bakiyelerini yönetin."
+      />
 
       <Card title="Sağlayıcıdan Kredi Alımı Kaydet">
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">

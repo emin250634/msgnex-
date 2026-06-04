@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import toast from "react-hot-toast"
@@ -21,8 +22,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState("")
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
     setApiError("")
 
     const result = registerSchema.safeParse(form)
@@ -95,49 +96,61 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-lg">
+    <div className="mx-auto w-full">
+      <div className="mb-10 flex justify-center">
+        <BrandLogo size="lg" className="max-w-[320px]" />
+      </div>
+
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Msgnex</h1>
-        <p className="mt-1 text-sm text-gray-500">Yeni hesap oluşturun</p>
+        <h1 className="text-2xl font-semibold text-gray-950">Yeni hesap oluşturun</h1>
+        <p className="mt-2 text-sm text-gray-500">
+          Firma hesabınızı oluşturun ve SMS operasyonlarını tek panelden yönetin.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           id="full_name"
           label="Ad Soyad"
+          className="rounded-none border-x-0 border-t-0 border-blue-700 px-0 shadow-none focus:border-blue-800 focus:ring-0"
           value={form.full_name}
-          onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+          onChange={(event) => setForm({ ...form, full_name: event.target.value })}
           error={errors.full_name}
         />
         <Input
           id="company_name"
           label="Firma Adı"
+          className="rounded-none border-x-0 border-t-0 border-blue-700 px-0 shadow-none focus:border-blue-800 focus:ring-0"
           value={form.company_name}
-          onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+          onChange={(event) => setForm({ ...form, company_name: event.target.value })}
           error={errors.company_name}
         />
         <Input
           id="email"
           label="E-posta"
           type="email"
+          className="rounded-none border-x-0 border-t-0 border-blue-700 px-0 shadow-none focus:border-blue-800 focus:ring-0"
           value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
           error={errors.email}
         />
         <Input
           id="password"
           label="Şifre"
           type="password"
+          className="rounded-none border-x-0 border-t-0 border-blue-700 px-0 shadow-none focus:border-blue-800 focus:ring-0"
           value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
+          onChange={(event) => setForm({ ...form, password: event.target.value })}
           error={errors.password}
         />
 
         {apiError && (
-          <p className="text-sm text-red-600">{apiError}</p>
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {apiError}
+          </div>
         )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="mt-2 w-full bg-blue-700 hover:bg-blue-800" disabled={loading}>
           {loading ? "Kaydediliyor..." : "Kaydol"}
         </Button>
       </form>

@@ -1,14 +1,39 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
+import { PageHeader } from "@/components/ui/page-header"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import type { SmsMessage } from "@/types"
 
 const PAGE_SIZE = 20
+
+function messageStatusLabel(status: SmsMessage["status"]) {
+  if (status === "sent") return "Gönderildi"
+  if (status === "delivered") return "Teslim Edildi"
+  if (status === "failed") return "Hata"
+  return "Bekliyor"
+}
+
+function messageStatusTone(status: SmsMessage["status"]) {
+  if (status === "sent" || status === "delivered") return "success" as const
+  if (status === "failed") return "danger" as const
+  return "warning" as const
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleString("tr-TR")
+}
+
+function shortId(value?: string | null) {
+  if (!value) return "-"
+  return value.length > 20 ? `${value.slice(0, 9)}...${value.slice(-7)}` : value
+}
 
 export default function HistoryPage() {
   const [messages, setMessages] = useState<SmsMessage[]>([])
@@ -31,8 +56,14 @@ export default function HistoryPage() {
   const filtered = useMemo(() => {
     if (!search.trim()) return messages
     const q = search.toLowerCase()
-    return messages.filter((m) =>
-      m.recipient.includes(q) || m.message.toLowerCase().includes(q) || m.status.toLowerCase().includes(q)
+    return messages.filter((message) =>
+      message.recipient.includes(q) ||
+      message.message.toLowerCase().includes(q) ||
+      message.status.toLowerCase().includes(q) ||
+      (message.provider_name || "").toLowerCase().includes(q) ||
+      (message.provider_status_code || "").toLowerCase().includes(q) ||
+      (message.provider_status_text || "").toLowerCase().includes(q) ||
+      (message.provider_message_id || "").toLowerCase().includes(q)
     )
   }, [messages, search])
 
@@ -48,13 +79,17 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Gönderim Geçmişi</h1>
+      <PageHeader
+        title="Gönderim Geçmişi"
+        description="Numara bazlı SMS durumlarını, provider yanıtlarını ve DLR zamanlarını izleyin."
+      />
+
       <Card title="SMS Geçmişi">
         <div className="mb-4">
           <Input
-            placeholder="Numara, mesaj veya durum ile ara..."
+            placeholder="Numara, mesaj, durum, provider veya provider id ile ara..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
 
@@ -64,35 +99,50 @@ export default function HistoryPage() {
               <Th>Alıcı</Th>
               <Th>Mesaj</Th>
               <Th>Durum</Th>
+              <Th>Provider</Th>
+              <Th>Provider Yanıtı</Th>
+              <Th>Final</Th>
+              <Th>Teslim/Hata</Th>
+              <Th>DLR Son Kontrol</Th>
               <Th>Kredi</Th>
-              <Th>Tarih</Th>
             </Tr>
           </THead>
           <TBody>
-            {paged.map((m) => (
-              <Tr key={m.id}>
-                <Td className="font-medium">{m.recipient}</Td>
-                <Td className="max-w-xs truncate" title={m.message}>{m.message}</Td>
+            {paged.map((message) => (
+              <Tr key={message.id}>
+                <Td className="font-medium">{message.recipient}</Td>
+                <Td className="max-w-xs truncate" title={message.message}>{message.message}</Td>
                 <Td>
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    m.status === "sent" || m.status === "delivered"
-                      ? "bg-green-100 text-green-700"
-                      : m.status === "failed"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-yellow-100 text-yellow-700"
-                  }`}>
-                    {m.status === "sent" ? "Gönderildi" : m.status === "delivered" ? "Teslim Edildi" : m.status === "failed" ? "Hata" : "Bekliyor"}
-                  </span>
+                  <StatusBadge label={messageStatusLabel(message.status)} tone={messageStatusTone(message.status)} />
                 </Td>
-                <Td>{m.credits_cost}</Td>
+                <Td>
+                  <div className="text-sm font-medium text-gray-900">{message.provider_name || "-"}</div>
+                  <div className="font-mono text-xs text-gray-500" title={message.provider_message_id || undefined}>
+                    {shortId(message.provider_message_id)}
+                  </div>
+                </Td>
+                <Td>
+                  <div className="font-mono text-xs text-gray-700">{message.provider_status_code || "-"}</div>
+                  <div className="mt-1 max-w-[220px] truncate text-xs text-gray-500" title={message.provider_status_text || undefined}>
+                    {message.provider_status_text || "-"}
+                  </div>
+                </Td>
+                <Td>
+                  <StatusBadge
+                    label={message.is_final ? "Final" : "Bekliyor"}
+                    tone={message.is_final ? "success" : "warning"}
+                  />
+                </Td>
                 <Td className="text-sm text-gray-500">
-                  {new Date(m.created_at).toLocaleString("tr-TR")}
+                  {message.delivered_at ? formatDate(message.delivered_at) : formatDate(message.failed_at)}
                 </Td>
+                <Td className="text-sm text-gray-500">{formatDate(message.last_dlr_checked_at)}</Td>
+                <Td>{message.credits_cost}</Td>
               </Tr>
             ))}
             {paged.length === 0 && (
               <Tr>
-                <Td colSpan={5} className="text-center text-gray-500">
+                <Td colSpan={9} className="text-center text-gray-500">
                   {search ? "Eşleşen kayıt bulunamadı" : "Gönderim bulunamadı"}
                 </Td>
               </Tr>
