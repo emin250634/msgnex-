@@ -1,15 +1,19 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { calculateSmsSegments } from "@/lib/sms-segments"
 import { createClient } from "@/lib/supabase/client"
-import type { SmsCampaign } from "@/types"
+import type { Group, SmsCampaign } from "@/types"
+
+type CampaignStatusFilter = "all" | SmsCampaign["status"]
+type DlrFilter = "all" | "awaiting" | "checked" | "completed" | "none"
 
 const statusLabels: Record<SmsCampaign["status"], string> = {
   draft: "Taslak",
@@ -64,28 +68,108 @@ function shortId(value?: string | null) {
   return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value
 }
 
+function dateOnly(value?: string | null) {
+  if (!value) return ""
+  return value.slice(0, 10)
+}
+
 function estimatedCampaignCredits(campaign: SmsCampaign) {
   return campaign.total_recipients * calculateSmsSegments(campaign.message).segments
 }
 
+function matchesDateRange(value: string, from: string, to: string) {
+  const date = dateOnly(value)
+  if (from && date < from) return false
+  if (to && date > to) return false
+  return true
+}
+
+function matchesDlr(campaign: SmsCampaign, filter: DlrFilter) {
+  if (filter === "all") return true
+  if (filter === "awaiting") return campaign.provider_status === "awaiting_dlr"
+  if (filter === "checked") return Boolean(campaign.dlr_last_checked_at)
+  if (filter === "completed") return Boolean(campaign.dlr_completed_at)
+  if (filter === "none") return !campaign.dlr_last_checked_at && !campaign.dlr_completed_at
+  return true
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [cancelTarget, setCancelTarget] = useState<SmsCampaign | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>("all")
+  const [providerFilter, setProviderFilter] = useState("all")
+  const [dlrFilter, setDlrFilter] = useState<DlrFilter>("all")
+  const [groupFilter, setGroupFilter] = useState("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
 
   const load = async () => {
     const supabase = createClient()
-    const { data } = await supabase
-      .from("sms_campaigns")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100)
-    setCampaigns(data ?? [])
+    const [{ data: campaignRows }, { data: groupRows }] = await Promise.all([
+      supabase
+        .from("sms_campaigns")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("groups")
+        .select("*")
+        .order("name", { ascending: true }),
+    ])
+    setCampaigns(campaignRows ?? [])
+    setGroups(groupRows ?? [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  const groupMap = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups])
+  const providerOptions = useMemo(() => Array.from(new Set(campaigns.map((campaign) => campaign.provider_name).filter(Boolean))) as string[], [campaigns])
+
+  const filteredCampaigns = useMemo(() => {
+    const q = search.trim().toLowerCase()
+
+    return campaigns.filter((campaign) => {
+      const group = campaign.group_id ? groupMap.get(campaign.group_id) : null
+      const searchable = [
+        campaign.name,
+        campaign.message,
+        campaign.provider_name,
+        campaign.provider_status,
+        campaign.provider_status_text,
+        group?.name,
+      ].filter(Boolean).join(" ").toLowerCase()
+
+      const matchesSearch = !q || searchable.includes(q)
+      const matchesStatus = statusFilter === "all" || campaign.status === statusFilter
+      const matchesProvider = providerFilter === "all" || campaign.provider_name === providerFilter
+      const matchesGroup = groupFilter === "all" || (groupFilter === "none" ? !campaign.group_id : campaign.group_id === groupFilter)
+
+      return matchesSearch &&
+        matchesStatus &&
+        matchesProvider &&
+        matchesGroup &&
+        matchesDlr(campaign, dlrFilter) &&
+        matchesDateRange(campaign.created_at, dateFrom, dateTo)
+    })
+  }, [campaigns, dateFrom, dateTo, dlrFilter, groupFilter, groupMap, providerFilter, search, statusFilter])
+
+  const hasActiveFilters = Boolean(search || statusFilter !== "all" || providerFilter !== "all" || dlrFilter !== "all" || groupFilter !== "all" || dateFrom || dateTo)
+
+  const clearFilters = () => {
+    setSearch("")
+    setStatusFilter("all")
+    setProviderFilter("all")
+    setDlrFilter("all")
+    setGroupFilter("all")
+    setDateFrom("")
+    setDateTo("")
+  }
 
   const handleCancel = async () => {
     if (!cancelTarget) return
@@ -121,12 +205,62 @@ export default function CampaignsPage() {
         <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
           Kuyruktaki kampanyaları iptal edebilirsiniz. Gönderilmeye başlanmış kampanyalar çift SMS riskini önlemek için otomatik tekrar gönderilmez.
         </div>
+
+        <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <Input
+              placeholder="Kampanya adı, mesaj, provider veya segment ara..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
+              {showFilters ? "Filtreleri Gizle" : "Filtreler"}
+            </Button>
+            <Button variant="secondary" onClick={clearFilters} disabled={!hasActiveFilters}>
+              Filtreleri Temizle
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <Select value={statusFilter} onChange={(value) => setStatusFilter(value as CampaignStatusFilter)}>
+                <option value="all">Tüm durumlar</option>
+                {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </Select>
+              <Select value={providerFilter} onChange={setProviderFilter}>
+                <option value="all">Tüm providerlar</option>
+                {providerOptions.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+              </Select>
+              <Select value={dlrFilter} onChange={(value) => setDlrFilter(value as DlrFilter)}>
+                <option value="all">Tüm DLR</option>
+                <option value="awaiting">DLR bekleyen</option>
+                <option value="checked">DLR kontrol edildi</option>
+                <option value="completed">DLR tamamlandı</option>
+                <option value="none">DLR yok</option>
+              </Select>
+              <Select value={groupFilter} onChange={setGroupFilter}>
+                <option value="all">Tüm segmentler</option>
+                <option value="none">Segmentsiz</option>
+                {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </Select>
+              <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <StatusBadge label={`${filteredCampaigns.length} sonuç`} tone="info" />
+            <span>Son 100 kampanya içinde filtreleniyor.</span>
+          </div>
+        </div>
+
         <Table>
           <THead>
             <Tr>
               <Th>Tarih</Th>
               <Th>Mesaj</Th>
               <Th>Alıcı</Th>
+              <Th>Segment</Th>
               <Th>Durum</Th>
               <Th>Provider</Th>
               <Th>Provider Durumu</Th>
@@ -136,63 +270,68 @@ export default function CampaignsPage() {
             </Tr>
           </THead>
           <TBody>
-            {campaigns.map((campaign) => (
-              <Tr key={campaign.id}>
-                <Td className="text-sm text-gray-500">{formatDate(campaign.created_at)}</Td>
-                <Td className="max-w-sm truncate" title={campaign.message}>{campaign.message}</Td>
-                <Td>
-                  <div className="text-sm font-medium text-gray-900">{campaign.total_recipients}</div>
-                  {campaign.skipped_recipients > 0 && (
-                    <div className="text-xs text-amber-700">{campaign.skipped_recipients} atlandı</div>
-                  )}
-                </Td>
-                <Td>
-                  <span className={`rounded-full px-2 py-1 text-xs font-medium ${statusClasses[campaign.status]}`}>
-                    {statusLabels[campaign.status]}
-                  </span>
-                </Td>
-                <Td>
-                  <div className="text-sm font-medium text-gray-900">{campaign.provider_name || "-"}</div>
-                  <div className="font-mono text-xs text-gray-500" title={campaign.provider_bulk_id || undefined}>
-                    {shortId(campaign.provider_bulk_id)}
-                  </div>
-                </Td>
-                <Td>
-                  <StatusBadge
-                    label={providerStatusLabel(campaign.provider_status)}
-                    tone={providerStatusTone(campaign.provider_status)}
-                  />
-                  {campaign.provider_status_text && (
-                    <div className="mt-1 max-w-[180px] truncate text-xs text-gray-500" title={campaign.provider_status_text}>
-                      {campaign.provider_status_text}
+            {filteredCampaigns.map((campaign) => {
+              const group = campaign.group_id ? groupMap.get(campaign.group_id) : null
+
+              return (
+                <Tr key={campaign.id}>
+                  <Td className="text-sm text-gray-500">{formatDate(campaign.created_at)}</Td>
+                  <Td className="max-w-sm truncate" title={campaign.message}>{campaign.message}</Td>
+                  <Td>
+                    <div className="text-sm font-medium text-gray-900">{campaign.total_recipients}</div>
+                    {campaign.skipped_recipients > 0 && (
+                      <div className="text-xs text-amber-700">{campaign.skipped_recipients} atlandı</div>
+                    )}
+                  </Td>
+                  <Td>{group ? <StatusBadge label={group.name} tone="info" /> : <StatusBadge label="-" tone="neutral" />}</Td>
+                  <Td>
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${statusClasses[campaign.status]}`}>
+                      {statusLabels[campaign.status]}
+                    </span>
+                  </Td>
+                  <Td>
+                    <div className="text-sm font-medium text-gray-900">{campaign.provider_name || "-"}</div>
+                    <div className="font-mono text-xs text-gray-500" title={campaign.provider_bulk_id || undefined}>
+                      {shortId(campaign.provider_bulk_id)}
                     </div>
-                  )}
-                </Td>
-                <Td>
-                  <div className="flex flex-wrap gap-1.5 text-xs">
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">
-                      {campaign.provider_success_count ?? campaign.success_count} başarılı
-                    </span>
-                    <span className="rounded-full bg-red-50 px-2 py-1 font-medium text-red-700">
-                      {campaign.provider_failed_count ?? campaign.fail_count} hatalı
-                    </span>
-                    <span className="rounded-full bg-amber-50 px-2 py-1 font-medium text-amber-700">
-                      {campaign.provider_pending_count ?? 0} bekleyen
-                    </span>
-                  </div>
-                </Td>
-                <Td className="text-sm text-gray-500">{formatDate(campaign.dlr_last_checked_at)}</Td>
-                <Td>
-                  {campaign.status === "queued" && (
-                    <Button variant="danger" size="sm" onClick={() => setCancelTarget(campaign)}>
-                      İptal Et
-                    </Button>
-                  )}
-                </Td>
-              </Tr>
-            ))}
-            {campaigns.length === 0 && (
-              <Tr><Td colSpan={9} className="text-center text-gray-500">Henüz kampanya bulunmuyor.</Td></Tr>
+                  </Td>
+                  <Td>
+                    <StatusBadge
+                      label={providerStatusLabel(campaign.provider_status)}
+                      tone={providerStatusTone(campaign.provider_status)}
+                    />
+                    {campaign.provider_status_text && (
+                      <div className="mt-1 max-w-[180px] truncate text-xs text-gray-500" title={campaign.provider_status_text}>
+                        {campaign.provider_status_text}
+                      </div>
+                    )}
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      <span className="rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700">
+                        {campaign.provider_success_count ?? campaign.success_count} başarılı
+                      </span>
+                      <span className="rounded-full bg-red-50 px-2 py-1 font-medium text-red-700">
+                        {campaign.provider_failed_count ?? campaign.fail_count} hatalı
+                      </span>
+                      <span className="rounded-full bg-amber-50 px-2 py-1 font-medium text-amber-700">
+                        {campaign.provider_pending_count ?? 0} bekleyen
+                      </span>
+                    </div>
+                  </Td>
+                  <Td className="text-sm text-gray-500">{formatDate(campaign.dlr_last_checked_at)}</Td>
+                  <Td>
+                    {campaign.status === "queued" && (
+                      <Button variant="danger" size="sm" onClick={() => setCancelTarget(campaign)}>
+                        İptal Et
+                      </Button>
+                    )}
+                  </Td>
+                </Tr>
+              )
+            })}
+            {filteredCampaigns.length === 0 && (
+              <Tr><Td colSpan={10} className="text-center text-gray-500">Filtreye uygun kampanya bulunmuyor.</Td></Tr>
             )}
           </TBody>
         </Table>
@@ -232,6 +371,14 @@ export default function CampaignsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500">
+      {children}
+    </select>
   )
 }
 

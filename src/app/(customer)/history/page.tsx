@@ -1,16 +1,20 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
+import { createClient } from "@/lib/supabase/client"
 import type { SmsMessage } from "@/types"
 
 const PAGE_SIZE = 20
+
+type MessageStatusFilter = "all" | SmsMessage["status"]
+type FinalFilter = "all" | "final" | "pending"
+type DeliveryFilter = "all" | "delivered" | "failed" | "not_resolved"
 
 function messageStatusLabel(status: SmsMessage["status"]) {
   if (status === "sent") return "Gönderildi"
@@ -35,10 +39,38 @@ function shortId(value?: string | null) {
   return value.length > 20 ? `${value.slice(0, 9)}...${value.slice(-7)}` : value
 }
 
+function dateOnly(value?: string | null) {
+  if (!value) return ""
+  return value.slice(0, 10)
+}
+
+function matchesDateRange(value: string, from: string, to: string) {
+  const date = dateOnly(value)
+  if (from && date < from) return false
+  if (to && date > to) return false
+  return true
+}
+
+function matchesDelivery(message: SmsMessage, filter: DeliveryFilter) {
+  if (filter === "all") return true
+  if (filter === "delivered") return Boolean(message.delivered_at) || message.status === "delivered"
+  if (filter === "failed") return Boolean(message.failed_at) || message.status === "failed"
+  if (filter === "not_resolved") return !message.delivered_at && !message.failed_at
+  return true
+}
+
 export default function HistoryPage() {
   const [messages, setMessages] = useState<SmsMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<MessageStatusFilter>("all")
+  const [providerFilter, setProviderFilter] = useState("all")
+  const [finalFilter, setFinalFilter] = useState<FinalFilter>("all")
+  const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all")
+  const [campaignFilter, setCampaignFilter] = useState("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -53,27 +85,60 @@ export default function HistoryPage() {
       })
   }, [])
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return messages
-    const q = search.toLowerCase()
-    return messages.filter((message) =>
-      message.recipient.includes(q) ||
-      message.message.toLowerCase().includes(q) ||
-      message.status.toLowerCase().includes(q) ||
-      (message.provider_name || "").toLowerCase().includes(q) ||
-      (message.provider_status_code || "").toLowerCase().includes(q) ||
-      (message.provider_status_text || "").toLowerCase().includes(q) ||
-      (message.provider_message_id || "").toLowerCase().includes(q)
-    )
-  }, [messages, search])
+  const providerOptions = useMemo(() => Array.from(new Set(messages.map((message) => message.provider_name).filter(Boolean))) as string[], [messages])
+  const campaignOptions = useMemo(() => Array.from(new Set(messages.map((message) => message.campaign_id).filter(Boolean))) as string[], [messages])
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+
+    return messages.filter((message) => {
+      const searchable = [
+        message.recipient,
+        message.message,
+        message.status,
+        message.provider_name,
+        message.provider_status_code,
+        message.provider_status_text,
+        message.provider_message_id,
+        message.campaign_id,
+      ].filter(Boolean).join(" ").toLowerCase()
+
+      const matchesSearch = !q || searchable.includes(q)
+      const matchesStatus = statusFilter === "all" || message.status === statusFilter
+      const matchesProvider = providerFilter === "all" || message.provider_name === providerFilter
+      const matchesFinal = finalFilter === "all" || (finalFilter === "final" ? message.is_final : !message.is_final)
+      const matchesCampaign = campaignFilter === "all" || (campaignFilter === "none" ? !message.campaign_id : message.campaign_id === campaignFilter)
+
+      return matchesSearch &&
+        matchesStatus &&
+        matchesProvider &&
+        matchesFinal &&
+        matchesCampaign &&
+        matchesDelivery(message, deliveryFilter) &&
+        matchesDateRange(message.created_at, dateFrom, dateTo)
+    })
+  }, [campaignFilter, dateFrom, dateTo, deliveryFilter, finalFilter, messages, providerFilter, search, statusFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paged = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
     return filtered.slice(start, start + PAGE_SIZE)
   }, [filtered, page])
 
-  useEffect(() => { setPage(1) }, [search])
+  const hasActiveFilters = Boolean(search || statusFilter !== "all" || providerFilter !== "all" || finalFilter !== "all" || deliveryFilter !== "all" || campaignFilter !== "all" || dateFrom || dateTo)
+
+  const clearFilters = () => {
+    setSearch("")
+    setStatusFilter("all")
+    setProviderFilter("all")
+    setFinalFilter("all")
+    setDeliveryFilter("all")
+    setCampaignFilter("all")
+    setDateFrom("")
+    setDateTo("")
+  }
+
+  useEffect(() => { setPage(1) }, [search, statusFilter, providerFilter, finalFilter, deliveryFilter, campaignFilter, dateFrom, dateTo])
 
   if (loading) return <p>Yükleniyor...</p>
 
@@ -85,12 +150,59 @@ export default function HistoryPage() {
       />
 
       <Card title="SMS Geçmişi">
-        <div className="mb-4">
-          <Input
-            placeholder="Numara, mesaj, durum, provider veya provider id ile ara..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+        <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+            <Input
+              placeholder="Telefon, mesaj, provider, provider id veya kampanya id ile ara..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
+              {showFilters ? "Filtreleri Gizle" : "Filtreler"}
+            </Button>
+            <Button variant="secondary" onClick={clearFilters} disabled={!hasActiveFilters}>
+              Filtreleri Temizle
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+              <Select value={statusFilter} onChange={(value) => setStatusFilter(value as MessageStatusFilter)}>
+                <option value="all">Tüm durumlar</option>
+                <option value="pending">Bekliyor</option>
+                <option value="sent">Gönderildi</option>
+                <option value="delivered">Teslim edildi</option>
+                <option value="failed">Hata</option>
+              </Select>
+              <Select value={providerFilter} onChange={setProviderFilter}>
+                <option value="all">Tüm providerlar</option>
+                {providerOptions.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+              </Select>
+              <Select value={finalFilter} onChange={(value) => setFinalFilter(value as FinalFilter)}>
+                <option value="all">Final / bekleyen</option>
+                <option value="final">Final</option>
+                <option value="pending">Bekleyen</option>
+              </Select>
+              <Select value={deliveryFilter} onChange={(value) => setDeliveryFilter(value as DeliveryFilter)}>
+                <option value="all">Teslim / hata</option>
+                <option value="delivered">Teslim edildi</option>
+                <option value="failed">Başarısız</option>
+                <option value="not_resolved">Sonuçlanmadı</option>
+              </Select>
+              <Select value={campaignFilter} onChange={setCampaignFilter}>
+                <option value="all">Tüm kampanyalar</option>
+                <option value="none">Kampanyasız</option>
+                {campaignOptions.map((campaignId) => <option key={campaignId} value={campaignId}>{campaignId.slice(0, 8)}...</option>)}
+              </Select>
+              <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+              <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <StatusBadge label={`${filtered.length} sonuç`} tone="info" />
+            <span>Mevcut kayıtlar içinde filtreleniyor.</span>
+          </div>
         </div>
 
         <Table>
@@ -143,7 +255,7 @@ export default function HistoryPage() {
             {paged.length === 0 && (
               <Tr>
                 <Td colSpan={9} className="text-center text-gray-500">
-                  {search ? "Eşleşen kayıt bulunamadı" : "Gönderim bulunamadı"}
+                  Filtreye uygun gönderim bulunamadı.
                 </Td>
               </Tr>
             )}
@@ -163,5 +275,13 @@ export default function HistoryPage() {
         )}
       </Card>
     </div>
+  )
+}
+
+function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500">
+      {children}
+    </select>
   )
 }
