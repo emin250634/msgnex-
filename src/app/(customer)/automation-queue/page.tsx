@@ -102,13 +102,18 @@ export default function AutomationQueuePage() {
             </TBody>
           </Table>
         ) : (
-          <EmptyState title="Kuyruk boş" description="Otomasyon adayları oluştuğunda burada listelenecek." />
+          <EmptyState
+            icon={<span className="text-2xl">OK</span>}
+            title="Otomasyon kuyruğu boş"
+            description="Otomasyon adayları oluştuğunda gönderim öncesi onay için burada listelenecek."
+            action={<Link href="/automations"><Button variant="secondary">Otomasyonlara Git</Button></Link>}
+          />
         )}
       </Card>
 
       <Card title="Gönderime Dönüşüm Notu">
         <p className="text-sm leading-6 text-gray-600">
-          Bu MVP ekranında onaylanan adaylar yalnızca UI durumunu değiştirir. Gerçek sürümde onaylanan adaylar mevcut kampanya/gönderim akışına aktarılmalıdır.
+          Bu MVP ekranında onaylanan adaylar yalnızca UI durumunu değiştirir. Gerçek sürümde onaylanan adaylar mevcut kampanya ve gönderim akışına aktarılmalıdır.
         </p>
       </Card>
     </div>

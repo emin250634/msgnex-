@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { ErrorState } from "@/components/ui/error-state"
 import { Input } from "@/components/ui/input"
+import { LoadingState } from "@/components/ui/loading-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
@@ -97,6 +100,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [cancelTarget, setCancelTarget] = useState<SmsCampaign | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
@@ -109,8 +113,10 @@ export default function CampaignsPage() {
   const [dateTo, setDateTo] = useState("")
 
   const load = async () => {
+    setLoading(true)
+    setError("")
     const supabase = createClient()
-    const [{ data: campaignRows }, { data: groupRows }] = await Promise.all([
+    const [{ data: campaignRows, error: campaignError }, { data: groupRows, error: groupError }] = await Promise.all([
       supabase
         .from("sms_campaigns")
         .select("*")
@@ -121,6 +127,9 @@ export default function CampaignsPage() {
         .select("*")
         .order("name", { ascending: true }),
     ])
+    if (campaignError || groupError) {
+      setError(campaignError?.message || groupError?.message || "Kampanya verileri yüklenemedi.")
+    }
     setCampaigns(campaignRows ?? [])
     setGroups(groupRows ?? [])
     setLoading(false)
@@ -191,7 +200,23 @@ export default function CampaignsPage() {
     load()
   }
 
-  if (loading) return <p>Yükleniyor...</p>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Kampanyalar" description="Toplu SMS gönderimlerinin operasyon ve provider durumlarını takip edin." />
+        <LoadingState variant="table" rows={6} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Kampanyalar" description="Toplu SMS gönderimlerinin operasyon ve provider durumlarını takip edin." />
+        <ErrorState description={error} onRetry={load} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -331,7 +356,16 @@ export default function CampaignsPage() {
               )
             })}
             {filteredCampaigns.length === 0 && (
-              <Tr><Td colSpan={10} className="text-center text-gray-500">Filtreye uygun kampanya bulunmuyor.</Td></Tr>
+              <Tr>
+                <Td colSpan={10}>
+                  <EmptyState
+                    icon={<span className="text-2xl">KP</span>}
+                    title={hasActiveFilters ? "Filtreye uygun kampanya yok" : "Henüz kampanya yok"}
+                    description={hasActiveFilters ? "Arama veya filtreleri değiştirerek tekrar deneyin." : "İlk SMS kampanyanızı oluşturduğunuzda burada listelenecek."}
+                    action={<Button variant="secondary" onClick={hasActiveFilters ? clearFilters : load}>{hasActiveFilters ? "Filtreleri Temizle" : "Yenile"}</Button>}
+                  />
+                </Td>
+              </Tr>
             )}
           </TBody>
         </Table>

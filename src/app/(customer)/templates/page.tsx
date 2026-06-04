@@ -1,19 +1,23 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { PageHeader } from "@/components/ui/page-header"
-import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
+import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
-import type { SmsTemplate } from "@/types"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { ErrorState } from "@/components/ui/error-state"
+import { Input } from "@/components/ui/input"
+import { LoadingState } from "@/components/ui/loading-state"
+import { PageHeader } from "@/components/ui/page-header"
+import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { MAX_SMS_LENGTH } from "@/lib/sms-segments"
+import { createClient } from "@/lib/supabase/client"
+import type { SmsTemplate } from "@/types"
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<SmsTemplate[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState("")
@@ -21,21 +25,42 @@ export default function TemplatesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
 
   const load = async () => {
+    setLoading(true)
+    setError("")
     const sb = createClient()
-    const { data: profile } = await sb.from("profiles").select("company_id").maybeSingle()
-    if (!profile?.company_id) { setLoading(false); return }
-    const { data } = await sb.from("sms_templates").select("*").eq("company_id", profile.company_id).order("name")
+    const { data: profile, error: profileError } = await sb.from("profiles").select("company_id").maybeSingle()
+    if (profileError) {
+      setError(profileError.message)
+      setLoading(false)
+      return
+    }
+    if (!profile?.company_id) {
+      setLoading(false)
+      return
+    }
+    const { data, error: templateError } = await sb.from("sms_templates").select("*").eq("company_id", profile.company_id).order("name")
+    if (templateError) setError(templateError.message)
     setTemplates(data ?? [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
+  const resetForm = () => {
+    setName("")
+    setMessage("")
+    setEditingId(null)
+    setShowForm(false)
+  }
+
   const handleSave = async () => {
     if (!name.trim() || !message.trim()) return
     const sb = createClient()
     const { data: profile } = await sb.from("profiles").select("company_id").maybeSingle()
-    if (!profile?.company_id) { toast.error("Firma bilgisi bulunamadı"); return }
+    if (!profile?.company_id) {
+      toast.error("Firma bilgisi bulunamadı")
+      return
+    }
 
     if (editingId) {
       await sb.from("sms_templates").update({ name: name.trim(), message }).eq("id", editingId)
@@ -45,17 +70,14 @@ export default function TemplatesPage() {
       toast.success("Şablon oluşturuldu")
     }
 
-    setName("")
-    setMessage("")
-    setEditingId(null)
-    setShowForm(false)
+    resetForm()
     load()
   }
 
-  const handleEdit = (t: SmsTemplate) => {
-    setName(t.name)
-    setMessage(t.message)
-    setEditingId(t.id)
+  const handleEdit = (template: SmsTemplate) => {
+    setName(template.name)
+    setMessage(template.message)
+    setEditingId(template.id)
     setShowForm(true)
   }
 
@@ -66,20 +88,29 @@ export default function TemplatesPage() {
     load()
   }
 
-  const handleUseTemplate = (t: SmsTemplate) => {
-    setName(t.name)
-    setMessage(t.message)
-    setEditingId(t.id)
-    setShowForm(true)
-  }
-
   const filtered = useMemo(() => {
     if (!search.trim()) return templates
     const q = search.toLowerCase()
-    return templates.filter((t) => t.name.toLowerCase().includes(q) || t.message.toLowerCase().includes(q))
+    return templates.filter((template) => template.name.toLowerCase().includes(q) || template.message.toLowerCase().includes(q))
   }, [templates, search])
 
-  if (loading) return <p>Yükleniyor...</p>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="SMS Şablonları" description="Sık kullanılan mesaj içeriklerini yönetin ve kampanya hazırlığını hızlandırın." />
+        <LoadingState variant="table" rows={5} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="SMS Şablonları" description="Sık kullanılan mesaj içeriklerini yönetin ve kampanya hazırlığını hızlandırın." />
+        <ErrorState description={error} onRetry={load} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -96,17 +127,12 @@ export default function TemplatesPage() {
       {showForm && (
         <Card title={editingId ? "Şablon Düzenle" : "Yeni Şablon"}>
           <div className="space-y-4">
-            <Input
-              label="Şablon Adı"
-              placeholder="Örn: Toplantı Hatırlatması"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <Input label="Şablon Adı" placeholder="Örn: Kampanya duyurusu" value={name} onChange={(event) => setName(event.target.value)} />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mesaj İçeriği</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Mesaj İçeriği</label>
               <textarea
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(event) => setMessage(event.target.value)}
                 rows={4}
                 maxLength={MAX_SMS_LENGTH}
                 className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -118,9 +144,7 @@ export default function TemplatesPage() {
               <Button onClick={handleSave} disabled={!name.trim() || !message.trim()}>
                 {editingId ? "Güncelle" : "Kaydet"}
               </Button>
-              <Button variant="danger" onClick={() => { setShowForm(false); setEditingId(null); setName(""); setMessage("") }}>
-                İptal
-              </Button>
+              <Button variant="secondary" onClick={resetForm}>İptal</Button>
             </div>
           </div>
         </Card>
@@ -128,44 +152,42 @@ export default function TemplatesPage() {
 
       <Card title="Şablon Listesi">
         <div className="mb-4">
-          <Input
-            placeholder="Şablon ara..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Şablon ara..." value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
-        <Table>
-          <THead>
-            <Tr>
-              <Th>Şablon Adı</Th>
-              <Th>Mesaj</Th>
-              <Th>Oluşturulma</Th>
-              <Th></Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {filtered.map((t) => (
-              <Tr key={t.id}>
-                <Td className="font-medium">{t.name}</Td>
-                <Td className="max-w-sm truncate text-sm text-gray-600">{t.message}</Td>
-                <Td className="text-sm text-gray-500">{new Date(t.created_at).toLocaleDateString("tr-TR")}</Td>
-                <Td>
-                  <div className="flex gap-1">
-                    <Button size="sm" onClick={() => handleEdit(t)}>Düzenle</Button>
-                    <Button variant="danger" size="sm" onClick={() => handleDelete(t.id)}>Sil</Button>
-                  </div>
-                </Td>
-              </Tr>
-            ))}
-            {filtered.length === 0 && (
+        {filtered.length > 0 ? (
+          <Table>
+            <THead>
               <Tr>
-                <Td colSpan={4} className="text-center text-gray-500">
-                  {search ? "Eşleşen şablon bulunamadı" : "Henüz şablon oluşturulmamış"}
-                </Td>
+                <Th>Şablon Adı</Th>
+                <Th>Mesaj</Th>
+                <Th>Oluşturulma</Th>
+                <Th></Th>
               </Tr>
-            )}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {filtered.map((template) => (
+                <Tr key={template.id}>
+                  <Td className="font-medium">{template.name}</Td>
+                  <Td className="max-w-sm truncate text-sm text-gray-600">{template.message}</Td>
+                  <Td className="text-sm text-gray-500">{new Date(template.created_at).toLocaleDateString("tr-TR")}</Td>
+                  <Td>
+                    <div className="flex gap-1">
+                      <Button size="sm" onClick={() => handleEdit(template)}>Düzenle</Button>
+                      <Button variant="danger" size="sm" onClick={() => handleDelete(template.id)}>Sil</Button>
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        ) : (
+          <EmptyState
+            icon={<span className="text-2xl">ŞB</span>}
+            title={search ? "Eşleşen şablon yok" : "Henüz şablon yok"}
+            description={search ? "Arama ifadesini değiştirerek tekrar deneyin." : "Sık kullandığınız mesajları şablon olarak kaydedin."}
+            action={<Button variant="secondary" onClick={search ? () => setSearch("") : () => setShowForm(true)}>{search ? "Aramayı Temizle" : "Şablon Oluştur"}</Button>}
+          />
+        )}
       </Card>
     </div>
   )

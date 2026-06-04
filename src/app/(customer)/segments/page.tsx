@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ErrorState } from "@/components/ui/error-state"
 import { Input } from "@/components/ui/input"
+import { LoadingState } from "@/components/ui/loading-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -29,21 +31,28 @@ export default function SegmentsPage() {
   const [groups, setGroups] = useState<Group[]>([])
   const [messages, setMessages] = useState<SmsMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [filter, setFilter] = useState<SegmentFilter>("all")
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
+      setError("")
       const supabase = createClient()
-      const { data: profile } = await supabase.from("profiles").select("company_id").maybeSingle()
+      const { data: profile, error: profileError } = await supabase.from("profiles").select("company_id").maybeSingle()
 
+      if (profileError) {
+        setError(profileError.message)
+        setLoading(false)
+        return
+      }
       if (!profile?.company_id) {
         setLoading(false)
         return
       }
 
-      const [{ data: contactRows }, { data: groupRows }, { data: messageRows }] = await Promise.all([
+      const [{ data: contactRows, error: contactError }, { data: groupRows, error: groupError }, { data: messageRows, error: messageError }] = await Promise.all([
         supabase
           .from("contacts")
           .select("*")
@@ -61,6 +70,10 @@ export default function SegmentsPage() {
           .order("created_at", { ascending: false })
           .limit(500),
       ])
+
+      if (contactError || groupError || messageError) {
+        setError(contactError?.message || groupError?.message || messageError?.message || "Segment verileri yüklenemedi.")
+      }
 
       setContacts(contactRows ?? [])
       setGroups(groupRows ?? [])
@@ -112,7 +125,24 @@ export default function SegmentsPage() {
   const unassignedCount = contacts.filter((contact) => !contact.group_id).length
   const activeCount = contacts.filter((contact) => activePhones.has(contact.phone)).length
 
-  if (loading) return <p>Yükleniyor...</p>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Segmentler" description="CRM kişi listenizi segment, etiket ve iletişim aktivitesine göre izleyin." />
+        <LoadingState variant="cards" rows={4} />
+        <LoadingState variant="list" rows={5} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Segmentler" description="CRM kişi listenizi segment, etiket ve iletişim aktivitesine göre izleyin." />
+        <ErrorState description={error} onRetry={() => window.location.reload()} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -151,6 +181,7 @@ export default function SegmentsPage() {
             </div>
           ) : (
             <EmptyState
+              icon={<span className="text-2xl">SG</span>}
               title="Segment yok"
               description="Segment oluşturmak için gruplar ekranını kullanabilirsiniz."
               action={<Link href="/groups"><Button>Segment Oluştur</Button></Link>}
@@ -216,7 +247,12 @@ export default function SegmentsPage() {
               </TBody>
             </Table>
           ) : (
-            <EmptyState title="Filtreye uygun kişi yok" description="Arama veya segment filtresini değiştirerek tekrar deneyin." />
+            <EmptyState
+              icon={<span className="text-2xl">Kİ</span>}
+              title="Filtreye uygun kişi yok"
+              description="Arama veya segment filtresini değiştirerek tekrar deneyin."
+              action={<Button variant="secondary" onClick={() => { setSearch(""); setFilter("all") }}>Filtreleri Temizle</Button>}
+            />
           )}
           {filteredContacts.length > 25 && (
             <p className="mt-4 text-sm text-gray-500">İlk 25 kişi gösteriliyor. Daha dar filtre kullanabilirsiniz.</p>

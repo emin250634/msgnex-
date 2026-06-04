@@ -22,10 +22,10 @@ export default function NewAutomationPage() {
   const [saved, setSaved] = useState(false)
 
   const preview = useMemo(() => {
-    if (type === "welcome") return "Yeni eklenen müşteriler için hoş geldin mesajı kuyruğa aday olarak düşer."
-    if (type === "birthday") return "Doğum günü alanı hazır olduğunda ilgili müşteriler aday olarak listelenir."
-    if (type === "inactive") return "Pasif segmentteki müşteriler için hatırlatma mesajı önerilir."
-    if (type === "payment") return "Vade/ödeme hatırlatması sonraki altyapı fazı için kapalı tutulur."
+    if (type === "welcome") return "Yeni eklenen kişiler için hoş geldin mesajı kuyruğa aday olarak düşer."
+    if (type === "birthday") return "Doğum günü alanı hazır olduğunda ilgili kişiler aday olarak listelenir."
+    if (type === "inactive") return "Pasif segmentteki kişiler için hatırlatma mesajı önerilir."
+    if (type === "payment") return "Vade ve ödeme hatırlatması sonraki altyapı fazı için kapalı tutulur."
     return "Seçilen segmente kampanya veya indirim duyurusu önerilir."
   }, [type])
 
@@ -33,7 +33,7 @@ export default function NewAutomationPage() {
     <div className="space-y-6">
       <PageHeader
         title="Otomasyon Oluştur"
-        description="Mock UI üzerinden otomasyon kuralı tasarlayın. Bu ekran henüz veritabanına kayıt yazmaz."
+        description="Otomasyon kuralını tasarlayın. Bu MVP ekranı henüz veritabanına kayıt yazmaz."
         actions={<Link href="/automations"><Button variant="secondary">Listeye Dön</Button></Link>}
       />
 
@@ -42,55 +42,39 @@ export default function NewAutomationPage() {
           <div className="grid gap-5">
             <Input label="Otomasyon adı" value={name} onChange={(event) => setName(event.target.value)} placeholder="Otomasyon adı" />
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tür seçimi</label>
+            <Field label="Tür seçimi">
               <select value={type} onChange={(event) => setType(event.target.value as AutomationType)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 {Object.entries(automationTypeLabels).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Segment seçimi</label>
+            <Field label="Segment seçimi">
               <select value={segment} onChange={(event) => setSegment(event.target.value)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 {segmentOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">SMS şablonu</label>
+            <Field label="SMS şablonu">
               <select value={template} onChange={(event) => setTemplate(event.target.value)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 {templateOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
-            </div>
+            </Field>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
-                <span>
-                  <span className="block text-sm font-semibold text-gray-950">Manuel onay</span>
-                  <span className="mt-1 block text-xs text-gray-500">Gönderimden önce kullanıcı kontrolü</span>
-                </span>
-                <input type="checkbox" checked={requiresApproval} onChange={(event) => setRequiresApproval(event.target.checked)} className="h-5 w-5 rounded border-gray-300" />
-              </label>
-
-              <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
-                <span>
-                  <span className="block text-sm font-semibold text-gray-950">Aktif</span>
-                  <span className="mt-1 block text-xs text-gray-500">MVP&apos;de sadece görsel durum</span>
-                </span>
-                <input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} className="h-5 w-5 rounded border-gray-300" />
-              </label>
+              <ToggleCard title="Manuel onay" description="Gönderimden önce kullanıcı kontrolü" checked={requiresApproval} onChange={setRequiresApproval} />
+              <ToggleCard title="Aktif" description="MVP sürümünde sadece görsel durum" checked={active} onChange={setActive} />
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button onClick={() => setSaved(true)}>Mock Olarak Kaydet</Button>
+              <Button onClick={() => setSaved(true)}>Taslağı Hazırla</Button>
               <Link href="/automation-queue"><Button variant="secondary">Kuyruğu Aç</Button></Link>
             </div>
 
             {saved && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-                Mock otomasyon taslağı hazırlandı. Bu işlem veritabanına kayıt yazmadı.
+                Otomasyon taslağı hazırlandı. Bu işlem veritabanına kayıt yazmadı.
               </div>
             )}
           </div>
@@ -122,6 +106,27 @@ export default function NewAutomationPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function ToggleCard({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-4">
+      <span>
+        <span className="block text-sm font-semibold text-gray-950">{title}</span>
+        <span className="mt-1 block text-xs text-gray-500">{description}</span>
+      </span>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 rounded border-gray-300" />
+    </label>
   )
 }
 

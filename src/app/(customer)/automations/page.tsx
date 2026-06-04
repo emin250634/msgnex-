@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -39,50 +40,59 @@ export default function AutomationsPage() {
       />
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Toplam Otomasyon" value={automationRules.length} description="Mock kurallar" tone="blue" />
+        <StatCard title="Toplam Otomasyon" value={automationRules.length} description="Hazırlık kuralları" tone="blue" />
         <StatCard title="Aktif" value={activeCount} description="Çalışmaya hazır akış" tone="emerald" />
         <StatCard title="Manuel Onaylı" value={approvalCount} description="Güvenli MVP modu" tone="amber" />
         <StatCard title="Aday Sayısı" value={totalCandidates} description="Onay bekleyen potansiyel" tone="slate" />
       </div>
 
       <Card title="Otomasyon Listesi">
-        <Table>
-          <THead>
-            <Tr>
-              <Th>Otomasyon</Th>
-              <Th>Durum</Th>
-              <Th>Tür</Th>
-              <Th>Şablon</Th>
-              <Th>Hedef Segment</Th>
-              <Th>Son Çalışma</Th>
-              <Th>Aday</Th>
-              <Th></Th>
-            </Tr>
-          </THead>
-          <TBody>
-            {automationRules.map((rule) => (
-              <Tr key={rule.id}>
-                <Td>
-                  <p className="font-semibold text-gray-950">{rule.name}</p>
-                  <p className="mt-1 text-xs text-gray-500">{rule.requiresApproval ? "Manuel onay gerekir" : "Otomatik gönderim kapalı önizleme"}</p>
-                </Td>
-                <Td>
-                  <StatusBadge label={rule.status === "active" ? "Aktif" : "Pasif"} tone={rule.status === "active" ? "success" : "neutral"} />
-                </Td>
-                <Td>
-                  <StatusBadge label={automationTypeLabels[rule.type]} tone={typeTone(rule.type)} />
-                </Td>
-                <Td>{rule.templateName}</Td>
-                <Td>{rule.segmentName}</Td>
-                <Td>{formatDate(rule.lastRunAt)}</Td>
-                <Td className="font-semibold text-gray-950">{rule.candidateCount}</Td>
-                <Td className="text-right">
-                  <Link href="/automation-queue"><Button variant="secondary" size="sm">Adayları Gör</Button></Link>
-                </Td>
+        {automationRules.length > 0 ? (
+          <Table>
+            <THead>
+              <Tr>
+                <Th>Otomasyon</Th>
+                <Th>Durum</Th>
+                <Th>Tür</Th>
+                <Th>Şablon</Th>
+                <Th>Hedef Segment</Th>
+                <Th>Son Çalışma</Th>
+                <Th>Aday</Th>
+                <Th></Th>
               </Tr>
-            ))}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {automationRules.map((rule) => (
+                <Tr key={rule.id}>
+                  <Td>
+                    <p className="font-semibold text-gray-950">{rule.name}</p>
+                    <p className="mt-1 text-xs text-gray-500">{rule.requiresApproval ? "Manuel onay gerekir" : "Gönderim öncesi kontrol gerekir"}</p>
+                  </Td>
+                  <Td>
+                    <StatusBadge label={rule.status === "active" ? "Aktif" : "Pasif"} tone={rule.status === "active" ? "success" : "neutral"} />
+                  </Td>
+                  <Td>
+                    <StatusBadge label={automationTypeLabels[rule.type]} tone={typeTone(rule.type)} />
+                  </Td>
+                  <Td>{rule.templateName}</Td>
+                  <Td>{rule.segmentName}</Td>
+                  <Td>{formatDate(rule.lastRunAt)}</Td>
+                  <Td className="font-semibold text-gray-950">{rule.candidateCount}</Td>
+                  <Td className="text-right">
+                    <Link href="/automation-queue"><Button variant="secondary" size="sm">Adayları Gör</Button></Link>
+                  </Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        ) : (
+          <EmptyState
+            icon={<span className="text-2xl">OT</span>}
+            title="Henüz otomasyon yok"
+            description="İlk manuel onaylı kampanya hazırlama otomasyonunuzu oluşturun."
+            action={<Link href="/automations/new"><Button>Otomasyon Oluştur</Button></Link>}
+          />
+        )}
       </Card>
 
       <Card title="MVP Çalışma Modeli">
@@ -97,7 +107,7 @@ export default function AutomationsPage() {
           </div>
           <div className="rounded-xl bg-gray-50 p-4">
             <p className="font-semibold text-gray-950">Canlıya hazırlık</p>
-            <p className="mt-1">Gerçek otomasyon için tablo ve worker katmanı sonraki fazda eklenecek.</p>
+            <p className="mt-1">Gerçek otomasyon için veri modeli sonraki fazda bağlanacak.</p>
           </div>
         </div>
       </Card>

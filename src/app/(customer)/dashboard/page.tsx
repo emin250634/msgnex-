@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { automationCandidates } from "@/lib/automation/mock-data"
 
 function messageStatusLabel(status: string) {
   if (status === "sent") return "Gönderildi"
@@ -95,6 +96,7 @@ export default async function CustomerDashboard() {
   let providerFailedCount = 0
   let reviewRequiredCount = 0
   let recentMessages: any[] = []
+  let recentFailedMessages: any[] = []
   let recentCampaigns: any[] = []
   let recentTransactions: any[] = []
 
@@ -177,6 +179,15 @@ export default async function CustomerDashboard() {
       .limit(6)
     recentMessages = msgs ?? []
 
+    const { data: failedMsgs } = await supabase
+      .from("sms_messages")
+      .select("*")
+      .eq("company_id", profile.company_id)
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(4)
+    recentFailedMessages = failedMsgs ?? []
+
     const { data: campaigns } = await supabase
       .from("sms_campaigns")
       .select("*")
@@ -197,6 +208,7 @@ export default async function CustomerDashboard() {
   const successRate = recentMessages.length > 0
     ? Math.round((recentMessages.filter((message) => message.status === "sent" || message.status === "delivered").length / recentMessages.length) * 100)
     : 0
+  const pendingAutomationCandidateCount = automationCandidates.filter((candidate) => candidate.status === "pending").length
 
   return (
     <div className="space-y-7">
@@ -211,6 +223,27 @@ export default async function CustomerDashboard() {
           Firma bilgisi eksik. Lütfen admin ile iletişime geçin.
         </div>
       )}
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {creditsBalance < 100 && (
+          <Link href="/balance" className="rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
+            <p className="text-sm font-semibold text-amber-900">Düşük bakiye</p>
+            <p className="mt-1 text-sm text-amber-800">Kalan kredi {creditsBalance}. Gönderim kesintisi yaşamamak için bakiye kontrolü önerilir.</p>
+          </Link>
+        )}
+        {awaitingDlrCount > 0 && (
+          <Link href="/campaigns" className="rounded-xl border border-blue-200 bg-blue-50 p-4 transition-colors hover:bg-blue-100">
+            <p className="text-sm font-semibold text-blue-900">DLR bekleyen kampanya</p>
+            <p className="mt-1 text-sm text-blue-800">{awaitingDlrCount} kampanya teslimat raporu bekliyor.</p>
+          </Link>
+        )}
+        {pendingAutomationCandidateCount > 0 && (
+          <Link href="/automation-queue" className="rounded-xl border border-violet-200 bg-violet-50 p-4 transition-colors hover:bg-violet-100">
+            <p className="text-sm font-semibold text-violet-900">Onay bekleyen otomasyon adayı</p>
+            <p className="mt-1 text-sm text-violet-800">{pendingAutomationCandidateCount} aday gönderim öncesi kontrol bekliyor.</p>
+          </Link>
+        )}
+      </div>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <StatCard title="Bakiye" value={creditsBalance} description="Kullanılabilir SMS kredisi" tone="blue" icon={<span className="font-semibold">₺</span>} trend={<MiniTrend tone="blue" />} />
@@ -361,6 +394,22 @@ export default async function CustomerDashboard() {
           </div>
         </Card>
       </div>
+
+      <Card title="Son Hatalı Gönderimler">
+        {recentFailedMessages.length > 0 ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {recentFailedMessages.map((message) => (
+              <div key={message.id} className="rounded-xl border border-red-100 bg-red-50 p-4">
+                <p className="font-mono text-sm font-semibold text-red-900">{message.recipient}</p>
+                <p className="mt-2 max-h-12 overflow-hidden text-sm text-red-800">{message.message}</p>
+                <p className="mt-2 text-xs text-red-700">{message.provider_status_text || formatDate(message.failed_at || message.created_at)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="Hatalı gönderim yok" description="Son hatalı gönderimler oluştuğunda burada görünecek." action={<Link href="/history"><Button variant="secondary">Geçmişi Aç</Button></Link>} />
+        )}
+      </Card>
 
       <Card title="Son Kredi Hareketleri">
         {recentTransactions.length > 0 ? (

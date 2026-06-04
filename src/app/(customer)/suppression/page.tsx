@@ -1,14 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { PageHeader } from "@/components/ui/page-header"
-import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
-import { parseSuppressionCsv } from "@/services/suppression-csv-parser"
 import toast from "react-hot-toast"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { ErrorState } from "@/components/ui/error-state"
+import { Input } from "@/components/ui/input"
+import { LoadingState } from "@/components/ui/loading-state"
+import { PageHeader } from "@/components/ui/page-header"
+import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
+import { createClient } from "@/lib/supabase/client"
+import { parseSuppressionCsv } from "@/services/suppression-csv-parser"
 import type { SuppressionEntry } from "@/types"
 
 export default function SuppressionPage() {
@@ -17,11 +20,17 @@ export default function SuppressionPage() {
   const [reason, setReason] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
 
   const load = async () => {
+    setLoading(true)
+    setError("")
     const supabase = createClient()
-    const { data, error } = await supabase.from("suppression_list").select("*").order("created_at", { ascending: false })
-    if (error) toast.error("Kara liste yüklenemedi")
+    const { data, error: loadError } = await supabase.from("suppression_list").select("*").order("created_at", { ascending: false })
+    if (loadError) {
+      setError(loadError.message)
+      toast.error("Kara liste yüklenemedi")
+    }
     setEntries(data ?? [])
     setLoading(false)
   }
@@ -32,8 +41,8 @@ export default function SuppressionPage() {
     if (!phone.trim()) return
     setSaving(true)
     const supabase = createClient()
-    const { error } = await supabase.rpc("add_suppression_entry", { p_phone: phone, p_reason: reason || null })
-    if (error) toast.error(error.message)
+    const { error: addError } = await supabase.rpc("add_suppression_entry", { p_phone: phone, p_reason: reason || null })
+    if (addError) toast.error(addError.message)
     else {
       toast.success("Numara kara listeye eklendi")
       setPhone("")
@@ -52,8 +61,8 @@ export default function SuppressionPage() {
       return
     }
     const supabase = createClient()
-    const { data, error } = await supabase.rpc("add_suppression_entries", { p_phones: parsed.phones, p_reason: reason || null })
-    if (error) toast.error(error.message)
+    const { data, error: csvError } = await supabase.rpc("add_suppression_entries", { p_phones: parsed.phones, p_reason: reason || null })
+    if (csvError) toast.error(csvError.message)
     else {
       toast.success(`${data} numara kara listeye işlendi`)
       await load()
@@ -64,8 +73,8 @@ export default function SuppressionPage() {
   const handleRemove = async (entry: SuppressionEntry) => {
     if (!window.confirm(`${entry.phone} kara listeden kaldırılsın mı?`)) return
     const supabase = createClient()
-    const { error } = await supabase.rpc("remove_suppression_entry", { p_id: entry.id })
-    if (error) toast.error(error.message)
+    const { error: removeError } = await supabase.rpc("remove_suppression_entry", { p_id: entry.id })
+    if (removeError) toast.error(removeError.message)
     else {
       toast.success("Numara kara listeden kaldırıldı")
       load()
@@ -86,7 +95,7 @@ export default function SuppressionPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={handleAdd} disabled={saving || !phone.trim()}>Ekle</Button>
-            <label className="cursor-pointer rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+            <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
               CSV ile Toplu Ekle
               <input type="file" accept=".csv,text/csv" className="hidden" disabled={saving} onChange={(event) => handleCsv(event.target.files?.[0])} />
             </label>
@@ -95,7 +104,11 @@ export default function SuppressionPage() {
         </div>
       </Card>
       <Card title={`Kara Listedeki Numaralar (${entries.length})`}>
-        {loading ? <p>Yükleniyor...</p> : (
+        {loading ? (
+          <LoadingState variant="table" rows={5} />
+        ) : error ? (
+          <ErrorState description={error} onRetry={load} />
+        ) : entries.length > 0 ? (
           <Table>
             <THead><Tr><Th>Telefon</Th><Th>Sebep</Th><Th>Eklenme Tarihi</Th><Th></Th></Tr></THead>
             <TBody>
@@ -107,9 +120,15 @@ export default function SuppressionPage() {
                   <Td><Button variant="danger" size="sm" onClick={() => handleRemove(entry)}>Kaldır</Button></Td>
                 </Tr>
               ))}
-              {entries.length === 0 && <Tr><Td colSpan={4} className="text-center text-gray-500">Kara listede numara bulunmuyor.</Td></Tr>}
             </TBody>
           </Table>
+        ) : (
+          <EmptyState
+            icon={<span className="text-2xl">KL</span>}
+            title="Kara listede numara yok"
+            description="SMS gönderilmemesi gereken numaraları ekleyerek güvenli gönderim yapabilirsiniz."
+            action={<Button variant="secondary" onClick={() => setPhone("05")}>Numara Ekle</Button>}
+          />
         )}
       </Card>
     </div>

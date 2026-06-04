@@ -3,7 +3,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
+import { ErrorState } from "@/components/ui/error-state"
 import { Input } from "@/components/ui/input"
+import { LoadingState } from "@/components/ui/loading-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
@@ -62,6 +65,7 @@ function matchesDelivery(message: SmsMessage, filter: DeliveryFilter) {
 export default function HistoryPage() {
   const [messages, setMessages] = useState<SmsMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<MessageStatusFilter>("all")
   const [providerFilter, setProviderFilter] = useState("all")
@@ -79,7 +83,8 @@ export default function HistoryPage() {
       .from("sms_messages")
       .select("*")
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error: loadError }) => {
+        if (loadError) setError(loadError.message)
         setMessages(data ?? [])
         setLoading(false)
       })
@@ -140,7 +145,23 @@ export default function HistoryPage() {
 
   useEffect(() => { setPage(1) }, [search, statusFilter, providerFilter, finalFilter, deliveryFilter, campaignFilter, dateFrom, dateTo])
 
-  if (loading) return <p>Yükleniyor...</p>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Gönderim Geçmişi" description="Numara bazlı SMS durumlarını, provider yanıtlarını ve DLR zamanlarını izleyin." />
+        <LoadingState variant="table" rows={7} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Gönderim Geçmişi" description="Numara bazlı SMS durumlarını, provider yanıtlarını ve DLR zamanlarını izleyin." />
+        <ErrorState description={error} onRetry={() => window.location.reload()} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -254,8 +275,13 @@ export default function HistoryPage() {
             ))}
             {paged.length === 0 && (
               <Tr>
-                <Td colSpan={9} className="text-center text-gray-500">
-                  Filtreye uygun gönderim bulunamadı.
+                <Td colSpan={9}>
+                  <EmptyState
+                    icon={<span className="text-2xl">GD</span>}
+                    title={hasActiveFilters ? "Filtreye uygun gönderim yok" : "Henüz gönderim yok"}
+                    description={hasActiveFilters ? "Arama veya filtreleri değiştirerek tekrar deneyin." : "İlk SMS gönderiminiz tamamlandığında kayıtlar burada görünecek."}
+                    action={<Button variant="secondary" onClick={hasActiveFilters ? clearFilters : () => window.location.reload()}>{hasActiveFilters ? "Filtreleri Temizle" : "Yenile"}</Button>}
+                  />
                 </Td>
               </Tr>
             )}

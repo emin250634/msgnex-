@@ -8,7 +8,9 @@ import { CsvUpload } from "@/components/forms/csv-upload"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ErrorState } from "@/components/ui/error-state"
 import { Input } from "@/components/ui/input"
+import { LoadingState } from "@/components/ui/loading-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -61,6 +63,7 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [uploadMode, setUploadMode] = useState<"none" | "single" | "csv">("none")
   const [search, setSearch] = useState("")
   const [groupFilter, setGroupFilter] = useState("all")
@@ -82,11 +85,13 @@ export default function ContactsPage() {
 
   const load = async () => {
     setLoading(true)
+    setError("")
     const supabase = createClient()
     const { data: profile, error: profileErr } = await supabase.from("profiles").select("company_id").maybeSingle()
 
     if (profileErr) {
       console.error("Profil sorgu hatası:", profileErr)
+      setError(profileErr.message)
       setLoading(false)
       return
     }
@@ -97,7 +102,7 @@ export default function ContactsPage() {
       return
     }
 
-    const [{ data: contactRows }, { data: groupRows }] = await Promise.all([
+    const [{ data: contactRows, error: contactError }, { data: groupRows, error: groupError }] = await Promise.all([
       supabase
         .from("contacts")
         .select("*")
@@ -109,6 +114,10 @@ export default function ContactsPage() {
         .eq("company_id", profile.company_id)
         .order("name", { ascending: true }),
     ])
+
+    if (contactError || groupError) {
+      setError(contactError?.message || groupError?.message || "Kişi verileri yüklenemedi.")
+    }
 
     setContacts(contactRows ?? [])
     setGroups(groupRows ?? [])
@@ -252,7 +261,24 @@ export default function ContactsPage() {
   const selectedGroup = selectedContact?.group_id ? groupMap.get(selectedContact.group_id) ?? null : null
   const selectedTags = selectedContact ? deriveContactTags(selectedContact, selectedGroup) : []
 
-  if (loading) return <p>Yükleniyor...</p>
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Kişiler" description="Müşteri kayıtlarını, segmentlerini ve iletişim geçmişini tek CRM görünümünde yönetin." />
+        <LoadingState variant="cards" rows={4} />
+        <LoadingState variant="table" rows={6} />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Kişiler" description="Müşteri kayıtlarını, segmentlerini ve iletişim geçmişini tek CRM görünümünde yönetin." />
+        <ErrorState description={error} onRetry={load} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -445,8 +471,10 @@ export default function ContactsPage() {
           </>
         ) : (
           <EmptyState
+            icon={<span className="text-2xl">Kİ</span>}
             title={search || groupFilter !== "all" || tagFilter !== "all" ? "Filtreye uygun kişi bulunamadı" : "Kişi bulunamadı"}
             description="Kişi ekleyerek veya CSV yükleyerek CRM listenizi oluşturmaya başlayın."
+            action={<Button variant="secondary" onClick={search || groupFilter !== "all" || tagFilter !== "all" ? () => { setSearch(""); setGroupFilter("all"); setTagFilter("all") } : () => setUploadMode("single")}>{search || groupFilter !== "all" || tagFilter !== "all" ? "Filtreleri Temizle" : "Kişi Ekle"}</Button>}
           />
         )}
       </Card>
