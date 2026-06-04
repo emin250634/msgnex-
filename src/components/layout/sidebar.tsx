@@ -22,6 +22,8 @@ type IconName =
   | "contacts"
   | "groups"
   | "segments"
+  | "automations"
+  | "queue"
   | "templates"
   | "suppression"
   | "balance"
@@ -40,6 +42,8 @@ const customerNav: NavItem[] = [
   { label: "Kişiler", href: "/contacts", icon: "contacts" },
   { label: "Gruplar", href: "/groups", icon: "groups" },
   { label: "Segmentler", href: "/segments", icon: "segments" },
+  { label: "Otomasyonlar", href: "/automations", icon: "automations" },
+  { label: "Otomasyon Kuyruğu", href: "/automation-queue", icon: "queue" },
   { label: "Şablonlar", href: "/templates", icon: "templates" },
   { label: "Kara Liste", href: "/suppression", icon: "suppression" },
   { label: "Bakiye", href: "/balance", icon: "balance" },
@@ -86,7 +90,7 @@ export function Sidebar({ profile, open = false, onClose }: SidebarProps) {
 
       <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
         {nav.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || (item.href === "/automations" && pathname.startsWith("/automations/"))
           return (
             <Link
               key={item.href}
@@ -188,6 +192,10 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M17 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1" /><circle cx="9" cy="7" r="4" /><path d="M23 20v-1a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
     case "segments":
       return <svg {...common}><path d="M4 5h16" /><path d="M7 12h10" /><path d="M10 19h4" /><path d="M6 5l5 7v5l2 2v-7l5-7" /></svg>
+    case "automations":
+      return <svg {...common}><path d="M12 3v4" /><path d="M12 17v4" /><path d="M3 12h4" /><path d="M17 12h4" /><circle cx="12" cy="12" r="5" /><path d="m15.5 8.5 1.5-1.5" /><path d="m7 17 1.5-1.5" /><path d="m8.5 8.5-1.5-1.5" /><path d="m15.5 15.5 1.5 1.5" /></svg>
+    case "queue":
+      return <svg {...common}><path d="M5 7h14" /><path d="M5 12h14" /><path d="M5 17h8" /><path d="m16 16 2 2 4-4" /></svg>
     case "templates":
       return <svg {...common}><path d="M6 3h8l4 4v17H6z" /><path d="M14 3v5h5" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
     case "suppression":
