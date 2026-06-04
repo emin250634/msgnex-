@@ -1,20 +1,24 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Card } from "@/components/ui/card"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/ui/page-header"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { calculateSmsSegments, MAX_SMS_LENGTH } from "@/lib/sms-segments"
-import toast from "react-hot-toast"
+import { createClient } from "@/lib/supabase/client"
 import type { Contact, Group, SmsTemplate } from "@/types"
+
+const NO_SEGMENT = "__none__"
+const ALL_CONTACTS = "__all__"
 
 export default function SmsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [templates, setTemplates] = useState<SmsTemplate[]>([])
-  const [selectedGroup, setSelectedGroup] = useState("")
+  const [selectedGroup, setSelectedGroup] = useState(NO_SEGMENT)
   const [manualNumbers, setManualNumbers] = useState("")
   const [message, setMessage] = useState("")
   const [senderId, setSenderId] = useState("")
@@ -25,6 +29,8 @@ export default function SmsPage() {
   const [templateName, setTemplateName] = useState("")
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [senderApproved, setSenderApproved] = useState(false)
+  const [confirmAllContacts, setConfirmAllContacts] = useState(false)
+  const [showFinalConfirm, setShowFinalConfirm] = useState(false)
 
   useEffect(() => {
     const sb = createClient()
@@ -42,29 +48,41 @@ export default function SmsPage() {
     })
   }, [])
 
+  const manualRecipients = useMemo(() => manualNumbers
+    .split(/[\n,]+/)
+    .map((number) => number.trim())
+    .filter(Boolean), [manualNumbers])
+
   const getRecipients = useCallback((): string[] => {
-    const groupRecipients = selectedGroup
-      ? contacts.filter((c) => c.group_id === selectedGroup).map((c) => c.phone)
-      : selectedGroup === "" ? contacts.map((c) => c.phone) : []
+    const groupRecipients =
+      selectedGroup === ALL_CONTACTS
+        ? contacts.map((contact) => contact.phone)
+        : selectedGroup !== NO_SEGMENT
+          ? contacts.filter((contact) => contact.group_id === selectedGroup).map((contact) => contact.phone)
+          : []
 
-    const manual = manualNumbers
-      .split(/[\n,]+/)
-      .map((n) => n.trim())
-      .filter(Boolean)
-
-    return Array.from(new Set([...groupRecipients, ...manual]))
-  }, [contacts, selectedGroup, manualNumbers])
+    return Array.from(new Set([...groupRecipients, ...manualRecipients]))
+  }, [contacts, manualRecipients, selectedGroup])
 
   const recipientCount = getRecipients().length
   const segmentInfo = calculateSmsSegments(message)
   const cost = recipientCount * segmentInfo.segments
+  const selectedGroupName = selectedGroup === ALL_CONTACTS
+    ? "Tüm Kişiler"
+    : selectedGroup === NO_SEGMENT
+      ? manualRecipients.length > 0 ? "Manuel numara girişi" : "Alıcı seçilmedi"
+      : groups.find((group) => group.id === selectedGroup)?.name || "Seçili segment"
+  const hasAudience = selectedGroup !== NO_SEGMENT || manualRecipients.length > 0
+  const requiresAllContactsApproval = selectedGroup === ALL_CONTACTS
+  const canPrepareSend = Boolean(message.trim()) && hasAudience && recipientCount > 0 && cost <= balance && senderApproved && (!requiresAllContactsApproval || confirmAllContacts)
 
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplate(id)
-    const tpl = templates.find((t) => t.id === id)
-    if (tpl) {
-      setMessage(tpl.message)
+    const template = templates.find((item) => item.id === id)
+    if (template) {
+      setMessage(template.message)
       setShowSaveTemplate(false)
+      setShowFinalConfirm(false)
     }
   }
 
@@ -72,21 +90,27 @@ export default function SmsPage() {
     if (!templateName.trim() || !message.trim()) return
     const sb = createClient()
     const { data: profile } = await sb.from("profiles").select("company_id").maybeSingle()
-    if (!profile?.company_id) { toast.error("Firma bilgisi bulunamadı"); return }
+    if (!profile?.company_id) {
+      toast.error("Firma bilgisi bulunamadı")
+      return
+    }
     const { error } = await sb.from("sms_templates").insert({
       company_id: profile.company_id,
       name: templateName.trim(),
       message,
     })
-    if (error) { toast.error("Şablon kaydedilemedi"); return }
-    toast.success("Şablon kaydedildi!")
+    if (error) {
+      toast.error("Şablon kaydedilemedi")
+      return
+    }
+    toast.success("Şablon kaydedildi")
     setTemplateName("")
     setShowSaveTemplate(false)
     sb.from("sms_templates").select("*").order("name").then(({ data }) => setTemplates(data ?? []))
   }
 
-  const handleDeleteTemplate = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
+  const handleDeleteTemplate = async (event: React.MouseEvent, id: string) => {
+    event.stopPropagation()
     const sb = createClient()
     await sb.from("sms_templates").delete().eq("id", id)
     setSelectedTemplate("")
@@ -94,14 +118,37 @@ export default function SmsPage() {
     toast.success("Şablon silindi")
   }
 
+  const handlePrepareSend = () => {
+    if (!message.trim()) {
+      toast.error("Mesaj içeriği zorunludur")
+      return
+    }
+    if (!hasAudience || recipientCount === 0) {
+      toast.error("Devam etmek için segment seçin veya manuel numara girin")
+      return
+    }
+    if (requiresAllContactsApproval && !confirmAllContacts) {
+      toast.error("Tüm kişilere gönderim için ek onayı işaretleyin")
+      return
+    }
+    if (cost > balance) {
+      toast.error(`Yetersiz bakiye. ${cost - balance} kredi eksik.`)
+      return
+    }
+    if (!senderApproved) {
+      toast.error("SMS başlığınız onaylanmadan gönderim yapılamaz")
+      return
+    }
+    setShowFinalConfirm(true)
+  }
+
   const handleSend = async () => {
-    if (!message.trim()) return
     setLoading(true)
     setQueuedCampaignId(null)
 
     const recipients = getRecipients()
     if (recipients.length === 0) {
-      toast.error("Gönderilecek kişi bulunamadı. Grup seçin veya numara girin.")
+      toast.error("Gönderilecek kişi bulunamadı. Segment seçin veya numara girin.")
       setLoading(false)
       return
     }
@@ -121,6 +168,7 @@ export default function SmsPage() {
 
     setBalance(data.balance)
     setQueuedCampaignId(data.campaignId)
+    setShowFinalConfirm(false)
     toast.success(`Kampanya kuyruğa alındı. ${data.reservedCredits} kredi rezerve edildi.${data.skippedRecipients ? ` ${data.skippedRecipients} kara listedeki numara atlandı.` : ""}`)
     setLoading(false)
   }
@@ -129,7 +177,7 @@ export default function SmsPage() {
     <div className="space-y-6">
       <PageHeader
         title="SMS Gönder"
-        description="Alıcı seçimi, mesaj içeriği ve kredi özetini kontrol ederek kampanya oluşturun."
+        description="Alıcı seçimi, mesaj içeriği ve kredi özetini kontrol ederek güvenli kampanya oluşturun."
         actions={
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-right">
             <p className="text-xs font-medium text-blue-700">Kalan Kredi</p>
@@ -142,16 +190,16 @@ export default function SmsPage() {
         <div className="flex flex-wrap gap-2">
           <select
             value={selectedTemplate}
-            onChange={(e) => handleTemplateSelect(e.target.value)}
+            onChange={(event) => handleTemplateSelect(event.target.value)}
             className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Şablon seçin (isteğe bağlı)</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
           {selectedTemplate && (
-            <Button variant="danger" size="sm" onClick={(e) => handleDeleteTemplate(e, selectedTemplate)}>
+            <Button variant="danger" size="sm" onClick={(event) => handleDeleteTemplate(event, selectedTemplate)}>
               Şablonu Sil
             </Button>
           )}
@@ -161,35 +209,61 @@ export default function SmsPage() {
       <Card title="Alıcılar">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Grup Seç (opsiyonel)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Segment Seç</label>
             <select
               value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
+              onChange={(event) => {
+                setSelectedGroup(event.target.value)
+                setConfirmAllContacts(false)
+                setShowFinalConfirm(false)
+              }}
               className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
-              <option value="">Tüm Kişiler ({contacts.length})</option>
-              <option value="__none__">Grup seçme (sadece manuel)</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} ({contacts.filter((c) => c.group_id === g.id).length})
+              <option value={NO_SEGMENT}>Alıcı seçilmedi</option>
+              <option value={ALL_CONTACTS}>Tüm Kişiler ({contacts.length})</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name} ({contacts.filter((contact) => contact.group_id === group.id).length})
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-gray-500">Varsayılan olarak hiçbir alıcı seçili değildir.</p>
           </div>
 
+          {selectedGroup === ALL_CONTACTS && (
+            <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              <input
+                type="checkbox"
+                checked={confirmAllContacts}
+                onChange={(event) => {
+                  setConfirmAllContacts(event.target.checked)
+                  setShowFinalConfirm(false)
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-amber-300"
+              />
+              <span>
+                <span className="block font-semibold">Tüm kişilere gönderimi onaylıyorum.</span>
+                <span className="mt-1 block">Bu seçim kayıtlı tüm kişileri kapsar. Devam etmek için bu ek onay zorunludur.</span>
+              </span>
+            </label>
+          )}
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Manuel Numara Girişi (opsiyonel)
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Manuel Numara Girişi
             </label>
             <textarea
               value={manualNumbers}
-              onChange={(e) => setManualNumbers(e.target.value)}
+              onChange={(event) => {
+                setManualNumbers(event.target.value)
+                setShowFinalConfirm(false)
+              }}
               rows={3}
               className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              placeholder="Numaraları virgül veya yeni satır ile ayırın&#10;Örn: 05551234567, 05559876543"
+              placeholder={"Numaraları virgül veya yeni satır ile ayırın\nÖrn: 05551234567, 05559876543"}
             />
             <p className="mt-1 text-xs text-gray-500">
-              {manualNumbers ? `${manualNumbers.split(/[\n,]+/).filter(Boolean).length} numara algılandı` : ""}
+              {manualNumbers ? `${manualRecipients.length} numara algılandı` : "Segment seçmeden manuel numara girerek de devam edebilirsiniz."}
             </p>
           </div>
         </div>
@@ -203,13 +277,7 @@ export default function SmsPage() {
               <span className="font-mono text-sm font-medium text-gray-900">
                 {senderId || "Henüz tanımlanmadı"}
               </span>
-              <span className={`rounded-full px-2 py-1 text-xs font-medium ${
-                senderApproved
-                  ? "bg-green-100 text-green-700"
-                  : "bg-amber-100 text-amber-700"
-              }`}>
-                {senderApproved ? "Onaylı" : "Admin onayı bekliyor"}
-              </span>
+              <StatusBadge label={senderApproved ? "Onaylı" : "Admin onayı bekliyor"} tone={senderApproved ? "success" : "warning"} />
             </div>
             {!senderApproved && (
               <p className="mt-1 text-xs text-amber-600">
@@ -221,7 +289,10 @@ export default function SmsPage() {
           <div>
             <textarea
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value)
+                setShowFinalConfirm(false)
+              }}
               rows={5}
               maxLength={MAX_SMS_LENGTH}
               className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -239,11 +310,11 @@ export default function SmsPage() {
           </div>
 
           {showSaveTemplate && (
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 placeholder="Şablon adı"
                 value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
+                onChange={(event) => setTemplateName(event.target.value)}
               />
               <Button onClick={handleSaveTemplate} disabled={!templateName.trim()}>
                 Kaydet
@@ -253,40 +324,60 @@ export default function SmsPage() {
         </div>
       </Card>
 
-      {recipientCount > 0 && (
-        <Card title="Gönderim Özeti">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Alıcı Sayısı</span>
-              <span className="font-medium">{recipientCount}</span>
+      <Card title="Gönderim Öncesi Özet">
+        <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-5">
+          <SummaryItem label="Alıcı sayısı" value={recipientCount.toString()} />
+          <SummaryItem label="Tahmini kredi" value={`${cost} kredi`} emphasize={cost > balance} />
+          <SummaryItem label="Segment / kaynak" value={selectedGroupName} />
+          <SummaryItem label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" />
+          <SummaryItem label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
+        </div>
+        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+          <p className="text-xs font-semibold uppercase text-gray-500">Mesaj önizleme</p>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{message || "Mesaj içeriği henüz girilmedi."}</p>
+        </div>
+        {cost > balance && (
+          <p className="mt-3 text-sm font-medium text-red-600">Yetersiz bakiye. {cost - balance} kredi eksik.</p>
+        )}
+      </Card>
+
+      {showFinalConfirm && (
+        <Card title="Son Onay">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+              <p className="text-lg font-semibold text-blue-950">{recipientCount} kişiye SMS gönderilecek</p>
+              <p className="mt-1">Tahmini {cost} kredi kullanılacak. Kampanya mevcut gönderim akışıyla kuyruğa alınır.</p>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Mesaj Parçası</span>
-              <span className="font-medium">{segmentInfo.segments} parça × {recipientCount} alıcı</span>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button onClick={handleSend} disabled={loading}>
+                {loading ? "Gönderiliyor..." : `${recipientCount} Kişiye SMS Gönder`}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowFinalConfirm(false)} disabled={loading}>Geri Dön</Button>
             </div>
-            <div className="border-t border-gray-200 pt-2 flex justify-between">
-              <span className="font-medium">Toplam Maliyet</span>
-              <span className={`font-bold ${cost > balance ? "text-red-600" : "text-primary-600"}`}>
-                {cost} Kredi
-              </span>
-            </div>
-            {cost > balance && (
-              <p className="text-xs text-red-600">Yetersiz bakiye! {cost - balance} kredi eksik.</p>
-            )}
           </div>
         </Card>
       )}
 
       <Card>
-        <div className="flex items-center gap-3">
-          <Button onClick={handleSend} disabled={loading || !message.trim() || cost > balance || !senderApproved}>
-            {loading ? "Gönderiliyor..." : `${recipientCount} Kişiye Gönder`}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button onClick={handlePrepareSend} disabled={loading || !canPrepareSend}>
+            Gönderimi İncele
           </Button>
+          {!hasAudience && <span className="text-sm text-amber-700">Devam etmek için segment seçin veya manuel numara girin.</span>}
           {queuedCampaignId && (
             <span className="text-sm text-blue-600">Kampanya kuyruğa alındı.</span>
           )}
         </div>
       </Card>
+    </div>
+  )
+}
+
+function SummaryItem({ label, value, emphasize = false }: { label: string; value: string; emphasize?: boolean }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
+      <p className={emphasize ? "mt-2 text-lg font-semibold text-red-700" : "mt-2 text-lg font-semibold text-gray-950"}>{value}</p>
     </div>
   )
 }

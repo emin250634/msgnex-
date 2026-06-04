@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
-import toast from "react-hot-toast"
+import { calculateSmsSegments } from "@/lib/sms-segments"
+import { createClient } from "@/lib/supabase/client"
 import type { SmsCampaign } from "@/types"
 
 const statusLabels: Record<SmsCampaign["status"], string> = {
@@ -63,9 +64,15 @@ function shortId(value?: string | null) {
   return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value
 }
 
+function estimatedCampaignCredits(campaign: SmsCampaign) {
+  return campaign.total_recipients * calculateSmsSegments(campaign.message).segments
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([])
   const [loading, setLoading] = useState(true)
+  const [cancelTarget, setCancelTarget] = useState<SmsCampaign | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   const load = async () => {
     const supabase = createClient()
@@ -80,17 +87,23 @@ export default function CampaignsPage() {
 
   useEffect(() => { load() }, [])
 
-  const handleCancel = async (id: string) => {
-    if (!window.confirm("Bu kampanya iptal edilsin mi? Ayrılan kredi bakiyenize iade edilecek.")) return
+  const handleCancel = async () => {
+    if (!cancelTarget) return
+
+    setCancelling(true)
     const supabase = createClient()
     const { data, error } = await supabase.rpc("cancel_queued_sms_campaign", {
-      p_campaign_id: id,
+      p_campaign_id: cancelTarget.id,
     })
+    setCancelling(false)
+
     if (error) {
       toast.error(error.message)
       return
     }
+
     toast.success(`${data.refund} kredi iade edildi`)
+    setCancelTarget(null)
     load()
   }
 
@@ -171,7 +184,7 @@ export default function CampaignsPage() {
                 <Td className="text-sm text-gray-500">{formatDate(campaign.dlr_last_checked_at)}</Td>
                 <Td>
                   {campaign.status === "queued" && (
-                    <Button variant="danger" size="sm" onClick={() => handleCancel(campaign.id)}>
+                    <Button variant="danger" size="sm" onClick={() => setCancelTarget(campaign)}>
                       İptal Et
                     </Button>
                   )}
@@ -184,6 +197,49 @@ export default function CampaignsPage() {
           </TBody>
         </Table>
       </Card>
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4">
+          <Card title="Kampanya İptal Onayı" className="w-full max-w-xl shadow-2xl">
+            <div className="space-y-5">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                <p className="text-lg font-semibold text-red-950">Bu kampanya iptal edilecek</p>
+                <p className="mt-1">İptal işlemi yalnızca kuyruktaki kampanyalar için uygulanır. Ayrılan kredi bakiyeye iade edilir.</p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <CancelMetric label="Etkilenecek kişi" value={`${cancelTarget.total_recipients} kişi`} />
+                <CancelMetric label="Atlanan kişi" value={`${cancelTarget.skipped_recipients ?? 0} kişi`} />
+                <CancelMetric label="Mesaj parçası" value={`${calculateSmsSegments(cancelTarget.message).segments} parça`} />
+                <CancelMetric label="Kullanılacak / ayrılan kredi" value={`${estimatedCampaignCredits(cancelTarget)} kredi`} />
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase text-gray-500">Mesaj</p>
+                <p className="mt-2 max-h-24 overflow-hidden text-sm leading-6 text-gray-700">{cancelTarget.message}</p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button variant="danger" onClick={handleCancel} disabled={cancelling}>
+                  {cancelling ? "İptal ediliyor..." : "Evet, Kampanyayı İptal Et"}
+                </Button>
+                <Button variant="secondary" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+                  Vazgeç
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CancelMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-gray-950">{value}</p>
     </div>
   )
 }
