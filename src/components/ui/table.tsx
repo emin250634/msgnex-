@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils/cn"
 
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className={cn("w-full text-sm", className)} {...props} />
+    <div className="w-full overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      <table className={cn("min-w-[760px] w-full text-sm", className)} {...props} />
     </div>
   )
 }
@@ -20,14 +20,14 @@ export function TBody({ className, ...props }: HTMLAttributes<HTMLTableSectionEl
 export function Th({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500", className)}
+      className={cn("whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500", className)}
       {...props}
     />
   )
 }
 
 export function Td({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-4 py-3 text-gray-700", className)} {...props} />
+  return <td className={cn("px-4 py-3 align-top text-gray-700", className)} {...props} />
 }
 
 export function Tr({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {

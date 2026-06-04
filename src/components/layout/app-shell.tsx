@@ -18,7 +18,7 @@ export function AppShell({ profile, children }: AppShellProps) {
       <Sidebar profile={profile} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-72">
         <Navbar profile={profile} onMenuClick={() => setSidebarOpen(true)} />
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="min-w-0 px-3 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</main>
       </div>
     </div>
   )

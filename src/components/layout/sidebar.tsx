@@ -157,7 +157,7 @@ export function Sidebar({ profile, open = false, onClose }: SidebarProps) {
             className="absolute inset-0 bg-gray-950/40"
             onClick={onClose}
           />
-          <aside className="relative h-full w-80 bg-[#071426] shadow-xl">
+          <aside className="relative h-full w-[min(20rem,calc(100vw-2rem))] bg-[#071426] shadow-xl">
             {content}
           </aside>
         </div>

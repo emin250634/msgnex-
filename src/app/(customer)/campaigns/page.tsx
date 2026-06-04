@@ -279,6 +279,50 @@ export default function CampaignsPage() {
           </div>
         </div>
 
+        <div className="space-y-3 lg:hidden">
+          {filteredCampaigns.length > 0 ? filteredCampaigns.map((campaign) => {
+            const group = campaign.group_id ? groupMap.get(campaign.group_id) : null
+
+            return (
+              <div key={campaign.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-950">{campaign.name || campaign.message}</p>
+                    <p className="mt-1 text-xs text-gray-500">{formatDate(campaign.created_at)}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${statusClasses[campaign.status]}`}>
+                    {statusLabels[campaign.status]}
+                  </span>
+                </div>
+                <p className="mt-3 max-h-16 overflow-hidden text-sm leading-6 text-gray-700">{campaign.message}</p>
+                <div className="mt-3 grid gap-2 text-xs text-gray-600">
+                  <div className="flex justify-between gap-3"><span>Alıcı</span><span className="font-semibold text-gray-950">{campaign.total_recipients}</span></div>
+                  <div className="flex justify-between gap-3"><span>Segment</span><span className="font-semibold text-gray-950">{group?.name || "-"}</span></div>
+                  <div className="flex justify-between gap-3"><span>Provider</span><span className="font-semibold text-gray-950">{campaign.provider_name || "-"}</span></div>
+                  <div className="flex justify-between gap-3"><span>DLR</span><span className="font-semibold text-gray-950">{formatDate(campaign.dlr_last_checked_at)}</span></div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <StatusBadge label={providerStatusLabel(campaign.provider_status)} tone={providerStatusTone(campaign.provider_status)} />
+                  <StatusBadge label={`${campaign.provider_pending_count ?? 0} bekleyen`} tone="warning" />
+                </div>
+                {campaign.status === "queued" && (
+                  <Button variant="danger" size="sm" className="mt-4 w-full" onClick={() => setCancelTarget(campaign)}>
+                    İptal Et
+                  </Button>
+                )}
+              </div>
+            )
+          }) : (
+            <EmptyState
+              icon={<span className="text-2xl">KP</span>}
+              title={hasActiveFilters ? "Filtreye uygun kampanya yok" : "Henüz kampanya yok"}
+              description={hasActiveFilters ? "Arama veya filtreleri değiştirerek tekrar deneyin." : "İlk SMS kampanyanızı oluşturduğunuzda burada listelenecek."}
+              action={<Button variant="secondary" onClick={hasActiveFilters ? clearFilters : load}>{hasActiveFilters ? "Filtreleri Temizle" : "Yenile"}</Button>}
+            />
+          )}
+        </div>
+
+        <div className="hidden lg:block">
         <Table>
           <THead>
             <Tr>
@@ -369,6 +413,7 @@ export default function CampaignsPage() {
             )}
           </TBody>
         </Table>
+        </div>
       </Card>
 
       {cancelTarget && (

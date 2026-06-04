@@ -226,6 +226,35 @@ export default function HistoryPage() {
           </div>
         </div>
 
+        <div className="space-y-3 lg:hidden">
+          {paged.length > 0 ? paged.map((message) => (
+            <div key={message.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-sm font-semibold text-gray-950">{message.recipient}</p>
+                  <p className="mt-1 text-xs text-gray-500">{formatDate(message.created_at)}</p>
+                </div>
+                <StatusBadge label={messageStatusLabel(message.status)} tone={messageStatusTone(message.status)} />
+              </div>
+              <p className="mt-3 max-h-16 overflow-hidden text-sm leading-6 text-gray-700">{message.message}</p>
+              <div className="mt-3 grid gap-2 text-xs text-gray-600">
+                <div className="flex justify-between gap-3"><span>Provider</span><span className="font-semibold text-gray-950">{message.provider_name || "-"}</span></div>
+                <div className="flex justify-between gap-3"><span>Provider ID</span><span className="font-mono font-semibold text-gray-950">{shortId(message.provider_message_id)}</span></div>
+                <div className="flex justify-between gap-3"><span>Final</span><span className="font-semibold text-gray-950">{message.is_final ? "Final" : "Bekliyor"}</span></div>
+                <div className="flex justify-between gap-3"><span>DLR</span><span className="font-semibold text-gray-950">{formatDate(message.last_dlr_checked_at)}</span></div>
+              </div>
+            </div>
+          )) : (
+            <EmptyState
+              icon={<span className="text-2xl">GD</span>}
+              title={hasActiveFilters ? "Filtreye uygun gönderim yok" : "Henüz gönderim yok"}
+              description={hasActiveFilters ? "Arama veya filtreleri değiştirerek tekrar deneyin." : "İlk SMS gönderiminiz tamamlandığında kayıtlar burada görünecek."}
+              action={<Button variant="secondary" onClick={hasActiveFilters ? clearFilters : () => window.location.reload()}>{hasActiveFilters ? "Filtreleri Temizle" : "Yenile"}</Button>}
+            />
+          )}
+        </div>
+
+        <div className="hidden lg:block">
         <Table>
           <THead>
             <Tr>
@@ -287,6 +316,7 @@ export default function HistoryPage() {
             )}
           </TBody>
         </Table>
+        </div>
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
