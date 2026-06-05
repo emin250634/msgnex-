@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -5,112 +7,61 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
-import { automationRules, automationTypeLabels } from "@/lib/automation/mock-data"
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  return new Date(value).toLocaleString("tr-TR")
-}
-
-function typeTone(type: string) {
-  if (type === "welcome") return "success" as const
-  if (type === "birthday") return "purple" as const
-  if (type === "inactive") return "warning" as const
-  if (type === "payment") return "danger" as const
-  return "info" as const
-}
 
 export default function AutomationsPage() {
-  const activeCount = automationRules.filter((rule) => rule.status === "active").length
-  const totalCandidates = automationRules.reduce((total, rule) => total + rule.candidateCount, 0)
-  const approvalCount = automationRules.filter((rule) => rule.requiresApproval).length
-
   return (
     <div className="space-y-6">
       <PageHeader
         title="Otomasyonlar"
-        description="Hoş geldin, kampanya ve müşteri hatırlatma akışlarını manuel onaylı şekilde yönetin."
+        description="Hoş geldin, kampanya ve müşteri hatırlatma akışları için hazırlık alanı."
         actions={
           <>
             <Link href="/automation-queue"><Button variant="secondary">Kuyruğu Gör</Button></Link>
-            <Link href="/automations/new"><Button>Otomasyon Oluştur</Button></Link>
+            <Link href="/automations/new"><Button variant="secondary">Otomasyon Oluştur</Button></Link>
           </>
         }
       />
 
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge label="Hazırlık Modu" tone="warning" />
+          <span className="font-semibold">Otomasyon modülü henüz gerçek backend’e bağlı değildir.</span>
+        </div>
+        <p className="mt-2">Gerçek otomasyon kuralı, aday üretimi veya SMS gönderimi yapılmaz.</p>
+      </div>
+
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Toplam Otomasyon" value={automationRules.length} description="Hazırlık kuralları" tone="blue" />
-        <StatCard title="Aktif" value={activeCount} description="Çalışmaya hazır akış" tone="emerald" />
-        <StatCard title="Manuel Onaylı" value={approvalCount} description="Güvenli MVP modu" tone="amber" />
-        <StatCard title="Aday Sayısı" value={totalCandidates} description="Onay bekleyen potansiyel" tone="slate" />
+        <StatCard title="Toplam Otomasyon" value={0} description="Gerçek kayıt yok" tone="slate" />
+        <StatCard title="Aktif" value={0} description="Backend bekleniyor" tone="amber" />
+        <StatCard title="Manuel Onaylı" value={0} description="Kural tablosu bekleniyor" tone="amber" />
+        <StatCard title="Aday Sayısı" value={0} description="Gerçek aday yok" tone="slate" />
       </div>
 
       <Card title="Otomasyon Listesi">
-        {automationRules.length > 0 ? (
-          <Table>
-            <THead>
-              <Tr>
-                <Th>Otomasyon</Th>
-                <Th>Durum</Th>
-                <Th>Tür</Th>
-                <Th>Şablon</Th>
-                <Th>Hedef Segment</Th>
-                <Th>Son Çalışma</Th>
-                <Th>Aday</Th>
-                <Th></Th>
-              </Tr>
-            </THead>
-            <TBody>
-              {automationRules.map((rule) => (
-                <Tr key={rule.id}>
-                  <Td>
-                    <p className="font-semibold text-gray-950">{rule.name}</p>
-                    <p className="mt-1 text-xs text-gray-500">{rule.requiresApproval ? "Manuel onay gerekir" : "Gönderim öncesi kontrol gerekir"}</p>
-                  </Td>
-                  <Td>
-                    <StatusBadge label={rule.status === "active" ? "Aktif" : "Pasif"} tone={rule.status === "active" ? "success" : "neutral"} />
-                  </Td>
-                  <Td>
-                    <StatusBadge label={automationTypeLabels[rule.type]} tone={typeTone(rule.type)} />
-                  </Td>
-                  <Td>{rule.templateName}</Td>
-                  <Td>{rule.segmentName}</Td>
-                  <Td>{formatDate(rule.lastRunAt)}</Td>
-                  <Td className="font-semibold text-gray-950">{rule.candidateCount}</Td>
-                  <Td className="text-right">
-                    <Link href="/automation-queue"><Button variant="secondary" size="sm">Adayları Gör</Button></Link>
-                  </Td>
-                </Tr>
-              ))}
-            </TBody>
-          </Table>
-        ) : (
-          <EmptyState
-            icon={<span className="text-2xl">OT</span>}
-            title="Henüz otomasyon yok"
-            description="İlk manuel onaylı kampanya hazırlama otomasyonunuzu oluşturun."
-            action={<Link href="/automations/new"><Button>Otomasyon Oluştur</Button></Link>}
-          />
-        )}
+        <EmptyState
+          icon={<span className="text-2xl">OT</span>}
+          title="Gerçek otomasyon kaydı yok"
+          description="Automation backend/RPC hazır olduğunda kurallar burada listelenecek. Şu an SMS gönderimi yapılmaz."
+          action={<Button variant="secondary" disabled>Backend Bekleniyor</Button>}
+        />
       </Card>
 
-      <Card title="MVP Çalışma Modeli">
+      <Card title="Canlıya Hazırlık">
         <div className="grid gap-4 text-sm text-gray-600 md:grid-cols-3">
-          <div className="rounded-xl bg-gray-50 p-4">
-            <p className="font-semibold text-gray-950">Manuel onay</p>
-            <p className="mt-1">Otomasyonlar aday üretir, gönderim kullanıcı onayından sonra ilerler.</p>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-4">
-            <p className="font-semibold text-gray-950">Mevcut altyapı</p>
-            <p className="mt-1">SMS şablonu, segment ve kampanya yapısı bozulmadan kullanılacak şekilde tasarlandı.</p>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-4">
-            <p className="font-semibold text-gray-950">Canlıya hazırlık</p>
-            <p className="mt-1">Gerçek otomasyon için veri modeli sonraki fazda bağlanacak.</p>
-          </div>
+          <InfoBox title="Kural kaydı" text="automation_rules tablosu veya RPC hazır olduğunda aktif edilecek." />
+          <InfoBox title="Aday üretimi" text="automation_candidates gerçek segment ve şablon verisinden üretilecek." />
+          <InfoBox title="Güvenli gönderim" text="İlk sürümde adaylar SMS göndermeden önce manuel onay bekleyecek." />
         </div>
       </Card>
+    </div>
+  )
+}
+
+function InfoBox({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-xl bg-gray-50 p-4">
+      <p className="font-semibold text-gray-950">{title}</p>
+      <p className="mt-1">{text}</p>
     </div>
   )
 }

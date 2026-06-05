@@ -5,6 +5,14 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        brand: {
+          ink: "#07152f",
+          navy: "#081b3f",
+          action: "#155eef",
+          "action-hover": "#0f4fd6",
+          line: "#dce5f2",
+          muted: "#64748b",
+        },
         primary: {
           50: "#eff6ff",
           100: "#dbeafe",

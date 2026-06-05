@@ -1,8 +1,9 @@
-export type Role = "admin" | "customer"
+export type Role = "admin" | "company_owner" | "company_admin" | "company_user" | "customer"
 
 export interface Profile {
   id: string
   full_name: string
+  email: string | null
   phone: string | null
   role: Role
   company_id: string | null
@@ -17,6 +18,7 @@ export interface Company {
   tax_no: string | null
   phone: string | null
   address: string | null
+  status: "pending_review" | "pending_provider_setup" | "active" | "suspended" | "rejected"
   is_active: boolean
   sender_name: string
   sender_approved: boolean
@@ -162,4 +164,32 @@ export interface CsvContactRow {
   last_name?: string
   phone: string
   email?: string
+}
+
+export interface CompanyUser {
+  id: string
+  company_id: string
+  user_id: string
+  role: "company_owner" | "company_admin" | "company_user"
+  is_active: boolean
+  invited_at: string | null
+  accepted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyInvitation {
+  id: string
+  company_id: string
+  user_id: string | null
+  email: string
+  full_name: string | null
+  role: "company_owner" | "company_admin" | "company_user"
+  status: "pending" | "accepted" | "revoked" | "failed"
+  invited_by: string | null
+  invited_at: string
+  accepted_at: string | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
 }

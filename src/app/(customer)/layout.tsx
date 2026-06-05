@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AppShell } from "@/components/layout/app-shell"
 
+const companyRoles = new Set(["customer", "company_owner", "company_admin", "company_user"])
+
 export default async function CustomerLayout({
   children,
 }: {
@@ -16,9 +18,10 @@ export default async function CustomerLayout({
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single()
+    .maybeSingle()
 
-  if (!profile || profile.role !== "customer") redirect("/login")
+  if (profile?.role === "admin") redirect("/admin/dashboard")
+  if (!profile || !profile.is_active || !companyRoles.has(profile.role)) redirect("/login")
 
   return <AppShell profile={profile}>{children}</AppShell>
 }

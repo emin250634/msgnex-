@@ -1,13 +1,17 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
-import { automationCandidates } from "@/lib/automation/mock-data"
+import { createClient } from "@/lib/supabase/server"
+
+function formatDate(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleString("tr-TR")
+}
 
 function messageStatusLabel(status: string) {
   if (status === "sent") return "Gönderildi"
@@ -50,11 +54,6 @@ function txTypeLabel(type: string) {
   return "Yükleme"
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  return new Date(value).toLocaleString("tr-TR")
-}
-
 function MiniTrend({ tone = "blue" }: { tone?: "blue" | "green" | "orange" | "purple" }) {
   const colors = {
     blue: "bg-blue-500",
@@ -62,6 +61,7 @@ function MiniTrend({ tone = "blue" }: { tone?: "blue" | "green" | "orange" | "pu
     orange: "bg-orange-500",
     purple: "bg-violet-500",
   }
+
   return (
     <div className="flex h-10 items-end gap-1.5">
       {[26, 34, 30, 42, 36, 48, 56].map((height, index) => (
@@ -80,9 +80,20 @@ export default async function CustomerDashboard() {
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single()
+    .maybeSingle()
 
-  if (!profile || profile.role !== "customer") redirect("/login")
+  if (profile?.role === "admin") redirect("/admin/dashboard")
+
+  const { data: activeMembership } = await supabase
+    .from("company_users")
+    .select("company_id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .not("accepted_at", "is", null)
+    .limit(1)
+    .maybeSingle()
+
+  const activeCompanyId = activeMembership?.company_id
 
   let companyName = "-"
   let creditsBalance = 0
@@ -90,7 +101,6 @@ export default async function CustomerDashboard() {
   let segmentCount = 0
   let vipCustomerCount = 0
   let emailCustomerCount = 0
-  let smsCount = 0
   let campaignCount = 0
   let awaitingDlrCount = 0
   let providerFailedCount = 0
@@ -100,36 +110,36 @@ export default async function CustomerDashboard() {
   let recentCampaigns: any[] = []
   let recentTransactions: any[] = []
 
-  if (profile.company_id) {
+  if (activeCompanyId) {
     const { data: company } = await supabase
       .from("companies")
       .select("name")
-      .eq("id", profile.company_id)
+      .eq("id", activeCompanyId)
       .single()
     companyName = company?.name || "-"
 
     const { data: credits } = await supabase
       .from("sms_credits")
       .select("balance")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .single()
     creditsBalance = credits?.balance ?? 0
 
-    const { count: cc } = await supabase
+    const { count: contactsTotal } = await supabase
       .from("contacts")
       .select("*", { count: "exact", head: true })
-      .eq("company_id", profile.company_id)
-    contactCount = cc ?? 0
+      .eq("company_id", activeCompanyId)
+    contactCount = contactsTotal ?? 0
 
     const { data: crmContacts } = await supabase
       .from("contacts")
       .select("group_id,email")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
 
     const { data: crmGroups } = await supabase
       .from("groups")
       .select("id,name")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
 
     segmentCount = crmGroups?.length ?? 0
     const vipGroupIds = new Set((crmGroups ?? [])
@@ -138,60 +148,54 @@ export default async function CustomerDashboard() {
     vipCustomerCount = (crmContacts ?? []).filter((contact) => contact.group_id && vipGroupIds.has(contact.group_id)).length
     emailCustomerCount = (crmContacts ?? []).filter((contact) => Boolean(contact.email)).length
 
-    const { count: sc } = await supabase
-      .from("sms_messages")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", profile.company_id)
-    smsCount = sc ?? 0
-
     const { count: campaignsTotal } = await supabase
       .from("sms_campaigns")
       .select("*", { count: "exact", head: true })
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
     campaignCount = campaignsTotal ?? 0
 
     const { count: awaitingDlr } = await supabase
       .from("sms_campaigns")
       .select("*", { count: "exact", head: true })
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .eq("provider_status", "awaiting_dlr")
     awaitingDlrCount = awaitingDlr ?? 0
 
     const { count: providerFailed } = await supabase
       .from("sms_campaigns")
       .select("*", { count: "exact", head: true })
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .eq("provider_status", "failed")
     providerFailedCount = providerFailed ?? 0
 
     const { count: reviewRequired } = await supabase
       .from("sms_campaigns")
       .select("*", { count: "exact", head: true })
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .eq("status", "review_required")
     reviewRequiredCount = reviewRequired ?? 0
 
-    const { data: msgs } = await supabase
+    const { data: messages } = await supabase
       .from("sms_messages")
       .select("*")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .order("created_at", { ascending: false })
       .limit(6)
-    recentMessages = msgs ?? []
+    recentMessages = messages ?? []
 
-    const { data: failedMsgs } = await supabase
+    const { data: failedMessages } = await supabase
       .from("sms_messages")
       .select("*")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .eq("status", "failed")
       .order("created_at", { ascending: false })
       .limit(4)
-    recentFailedMessages = failedMsgs ?? []
+    recentFailedMessages = failedMessages ?? []
 
     const { data: campaigns } = await supabase
       .from("sms_campaigns")
       .select("*")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .order("created_at", { ascending: false })
       .limit(5)
     recentCampaigns = campaigns ?? []
@@ -199,7 +203,7 @@ export default async function CustomerDashboard() {
     const { data: transactions } = await supabase
       .from("credit_transactions")
       .select("*")
-      .eq("company_id", profile.company_id)
+      .eq("company_id", activeCompanyId)
       .order("created_at", { ascending: false })
       .limit(5)
     recentTransactions = transactions ?? []
@@ -208,7 +212,6 @@ export default async function CustomerDashboard() {
   const successRate = recentMessages.length > 0
     ? Math.round((recentMessages.filter((message) => message.status === "sent" || message.status === "delivered").length / recentMessages.length) * 100)
     : 0
-  const pendingAutomationCandidateCount = automationCandidates.filter((candidate) => candidate.status === "pending").length
 
   return (
     <div className="space-y-7">
@@ -218,9 +221,9 @@ export default async function CustomerDashboard() {
         actions={<Link href="/sms"><Button className="bg-blue-700 hover:bg-blue-800">SMS Gönder</Button></Link>}
       />
 
-      {!profile.company_id && (
+      {!activeCompanyId && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Firma bilgisi eksik. Lütfen admin ile iletişime geçin.
+          Bu kullanıcı aktif bir firmaya bağlı değil veya davet kabul işlemi tamamlanmamış.
         </div>
       )}
 
@@ -237,76 +240,27 @@ export default async function CustomerDashboard() {
             <p className="mt-1 text-sm text-blue-800">{awaitingDlrCount} kampanya teslimat raporu bekliyor.</p>
           </Link>
         )}
-        {pendingAutomationCandidateCount > 0 && (
-          <Link href="/automation-queue" className="rounded-xl border border-violet-200 bg-violet-50 p-4 transition-colors hover:bg-violet-100">
-            <p className="text-sm font-semibold text-violet-900">Onay bekleyen otomasyon adayı</p>
-            <p className="mt-1 text-sm text-violet-800">{pendingAutomationCandidateCount} aday gönderim öncesi kontrol bekliyor.</p>
-          </Link>
-        )}
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <StatCard title="Bakiye" value={creditsBalance} description="Kullanılabilir SMS kredisi" tone="blue" icon={<span className="font-semibold">₺</span>} trend={<MiniTrend tone="blue" />} />
         <StatCard title="Kişiler" value={contactCount} description="Toplam kayıtlı kişi" tone="emerald" icon={<span className="font-semibold">KŞ</span>} trend={<MiniTrend tone="green" />} />
         <StatCard title="Kampanyalar" value={campaignCount} description="Toplam kampanya" tone="slate" icon={<span className="font-semibold">KP</span>} trend={<MiniTrend tone="purple" />} />
-        <StatCard title="Teslimat Oranı" value={`%${successRate}`} description="Son kayıtlar üzerinden özet" tone="amber" icon={<span className="font-semibold">✓</span>} trend={<MiniTrend tone="orange" />} />
+        <StatCard title="Teslimat Oranı" value={`%${successRate}`} description="Son kayıtlar üzerinden özet" tone="amber" icon={<span className="font-semibold">OK</span>} trend={<MiniTrend tone="orange" />} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-600">VIP Müşteri</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-950">{vipCustomerCount}</p>
-              <p className="mt-1 text-xs text-gray-500">VIP segmentindeki kayıtlar</p>
-            </div>
-            <StatusBadge label="CRM" tone="purple" />
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-600">Segmentler</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-950">{segmentCount}</p>
-              <p className="mt-1 text-xs text-gray-500">Aktif grup/segment sayısı</p>
-            </div>
-            <StatusBadge label="Hazır" tone="info" />
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-gray-600">Çok Kanallı Kayıt</p>
-              <p className="mt-2 text-3xl font-semibold text-gray-950">{emailCustomerCount}</p>
-              <p className="mt-1 text-xs text-gray-500">E-posta bilgisi bulunan kişiler</p>
-            </div>
-            <StatusBadge label="CRM" tone="success" />
-          </div>
-        </Card>
+        <DashboardMetric title="VIP Müşteri" value={vipCustomerCount} description="VIP segmentindeki kayıtlar" tone="purple" />
+        <DashboardMetric title="Segmentler" value={segmentCount} description="Aktif grup/segment sayısı" tone="info" />
+        <DashboardMetric title="Çok Kanallı Kayıt" value={emailCustomerCount} description="E-posta bilgisi bulunan kişiler" tone="success" />
       </div>
 
       <Card>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl bg-red-50 p-4">
-            <p className="text-sm font-semibold text-red-800">DLR Bekleyen</p>
-            <p className="mt-2 text-3xl font-semibold text-red-900">{awaitingDlrCount}</p>
-            <p className="mt-1 text-xs text-red-700">Teslimat raporu bekleyen</p>
-          </div>
-          <div className="rounded-xl bg-orange-50 p-4">
-            <p className="text-sm font-semibold text-orange-800">Provider Hatası</p>
-            <p className="mt-2 text-3xl font-semibold text-orange-900">{providerFailedCount}</p>
-            <p className="mt-1 text-xs text-orange-700">Hata alan kampanyalar</p>
-          </div>
-          <div className="rounded-xl bg-violet-50 p-4">
-            <p className="text-sm font-semibold text-violet-800">İnceleme Gereken</p>
-            <p className="mt-2 text-3xl font-semibold text-violet-900">{reviewRequiredCount}</p>
-            <p className="mt-1 text-xs text-violet-700">Operasyon kontrolü gereken</p>
-          </div>
-          <div className="rounded-xl bg-emerald-50 p-4">
-            <p className="text-sm font-semibold text-emerald-800">Sistem Sağlığı</p>
-            <p className="mt-2 text-3xl font-semibold text-emerald-900">Aktif</p>
-            <p className="mt-1 text-xs text-emerald-700">Gönderim akışı hazır</p>
-          </div>
+          <StatusMetric title="DLR Bekleyen" value={awaitingDlrCount} description="Teslimat raporu bekleyen" tone="red" />
+          <StatusMetric title="Provider Hatası" value={providerFailedCount} description="Hata alan kampanyalar" tone="orange" />
+          <StatusMetric title="İnceleme Gereken" value={reviewRequiredCount} description="Operasyon kontrolü gereken" tone="violet" />
+          <StatusMetric title="Sistem Sağlığı" value="Hazır" description="Panel akışı aktif, provider ayarı bekleniyor" tone="emerald" />
         </div>
       </Card>
 
@@ -339,18 +293,16 @@ export default async function CustomerDashboard() {
         <Card title="Provider Durumu">
           <div className="space-y-4">
             {[
-              ["NETGSM", "Aktif", smsCount, Math.max(smsCount - providerFailedCount, 0), providerFailedCount],
-              ["DLR Servisi", "Hazır", awaitingDlrCount, Math.max(awaitingDlrCount - providerFailedCount, 0), providerFailedCount],
-              ["Gönderim Kuyruğu", "Aktif", campaignCount, Math.max(campaignCount - reviewRequiredCount, 0), reviewRequiredCount],
-            ].map(([label, status, total, success, fail]) => (
-              <div key={label} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 rounded-xl border border-gray-100 p-4 text-sm">
+              ["Provider", "Henüz yapılandırılmadı", "Firma bazlı Netgsm bağlantısı backend entegrasyonu sonrası gösterilecek."],
+              ["DLR", "Gerçek bağlantı bekleniyor", "Teslimat raporu görünümü provider/DLR worker bağlandıktan sonra aktif olacak."],
+              ["Gönderim Kuyruğu", "Sistem hazır, provider bekleniyor", "Kampanya kuyruğu mevcut; canlı gönderim için firma provider ayarı gerekir."],
+            ].map(([label, status, description]) => (
+              <div key={label} className="grid gap-3 rounded-xl border border-gray-100 p-4 text-sm md:grid-cols-[1fr_auto] md:items-center">
                 <div>
                   <p className="font-semibold text-gray-950">{label}</p>
-                  <StatusBadge label={String(status)} tone="success" className="mt-2" />
+                  <p className="mt-1 text-sm text-gray-500">{description}</p>
                 </div>
-                <div className="text-right"><p className="text-xs text-gray-500">Gönderim</p><p className="font-semibold text-gray-900">{Number(total)}</p></div>
-                <div className="text-right"><p className="text-xs text-gray-500">Başarılı</p><p className="font-semibold text-emerald-700">{Number(success)}</p></div>
-                <div className="text-right"><p className="text-xs text-gray-500">Hata</p><p className="font-semibold text-red-700">{Number(fail)}</p></div>
+                <StatusBadge label={String(status)} tone="warning" />
               </div>
             ))}
           </div>
@@ -387,7 +339,7 @@ export default async function CustomerDashboard() {
           <div className="grid gap-3 sm:grid-cols-2">
             <QuickAction href="/sms" label="SMS Gönder" icon="↗" />
             <QuickAction href="/contacts" label="Kişi Ekle" icon="+" />
-            <QuickAction href="/groups" label="Grup Oluştur" icon="◎" />
+            <QuickAction href="/groups" label="Grup Oluştur" icon="●" />
             <QuickAction href="/templates" label="Şablon Oluştur" icon="✎" />
             <QuickAction href="/campaigns" label="Kampanyalar" icon="▤" />
             <QuickAction href="/balance" label="Bakiye" icon="₺" />
@@ -414,14 +366,14 @@ export default async function CustomerDashboard() {
       <Card title="Son Kredi Hareketleri">
         {recentTransactions.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {recentTransactions.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4">
+            {recentTransactions.map((transaction) => (
+              <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-950">{txTypeLabel(tx.type)}</p>
-                  <p className="mt-1 truncate text-xs text-gray-500">{tx.note || formatDate(tx.created_at)}</p>
+                  <p className="text-sm font-semibold text-gray-950">{txTypeLabel(transaction.type)}</p>
+                  <p className="mt-1 truncate text-xs text-gray-500">{transaction.note || formatDate(transaction.created_at)}</p>
                 </div>
-                <p className={tx.amount >= 0 ? "text-sm font-semibold text-emerald-700" : "text-sm font-semibold text-red-700"}>
-                  {tx.amount > 0 ? "+" : ""}{tx.amount}
+                <p className={transaction.amount >= 0 ? "text-sm font-semibold text-emerald-700" : "text-sm font-semibold text-red-700"}>
+                  {transaction.amount > 0 ? "+" : ""}{transaction.amount}
                 </p>
               </div>
             ))}
@@ -430,6 +382,38 @@ export default async function CustomerDashboard() {
           <EmptyState title="Kredi hareketi yok" description="Kredi işlemleri burada görünecek." />
         )}
       </Card>
+    </div>
+  )
+}
+
+function DashboardMetric({ title, value, description, tone }: { title: string; value: number; description: string; tone: "purple" | "info" | "success" }) {
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-600">{title}</p>
+          <p className="mt-2 text-3xl font-semibold text-gray-950">{value}</p>
+          <p className="mt-1 text-xs text-gray-500">{description}</p>
+        </div>
+        <StatusBadge label="CRM" tone={tone} />
+      </div>
+    </Card>
+  )
+}
+
+function StatusMetric({ title, value, description, tone }: { title: string; value: number | string; description: string; tone: "red" | "orange" | "violet" | "emerald" }) {
+  const colors = {
+    red: "bg-red-50 text-red-900",
+    orange: "bg-orange-50 text-orange-900",
+    violet: "bg-violet-50 text-violet-900",
+    emerald: "bg-emerald-50 text-emerald-900",
+  }
+
+  return (
+    <div className={`rounded-xl p-4 ${colors[tone]}`}>
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="mt-2 text-3xl font-semibold">{value}</p>
+      <p className="mt-1 text-xs opacity-80">{description}</p>
     </div>
   )
 }

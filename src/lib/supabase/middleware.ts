@@ -1,7 +1,14 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
-const authPages = ["/login", "/register"]
+const authPages = ["/login", "/register", "/reset-password"]
+
+function redirectTo(request: NextRequest, pathname: string) {
+  if (request.nextUrl.pathname === pathname) return null
+  const url = request.nextUrl.clone()
+  url.pathname = pathname
+  return NextResponse.redirect(url)
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -29,61 +36,57 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   const isAuthPage = authPages.includes(pathname)
+  const isResetPasswordPage = pathname === "/reset-password"
   const isAdminPage = pathname.startsWith("/admin")
-  const isPublicPage = pathname === "/" || pathname.startsWith("/api/")
+  const isPublicPage = pathname === "/" || pathname.startsWith("/api/") || pathname.startsWith("/auth/callback")
 
-  // Public sayfaları atla
   if (isPublicPage) return supabaseResponse
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Giriş yoksa sadece auth sayfalarına izin ver
   if (!user) {
     if (!isAuthPage) {
-      const url = request.nextUrl.clone()
-      url.pathname = "/login"
-      return NextResponse.redirect(url)
+      return redirectTo(request, "/login") || supabaseResponse
     }
     return supabaseResponse
   }
 
-  // Giriş var ama profil sorgusu başarısız olabilir
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, is_active")
     .eq("id", user.id)
-    .single()
+    .maybeSingle()
 
-  // Profil yoksa veya pasifse auth sayfalarına izin ver, diğerlerini login'e at
   if (!profile || !profile.is_active) {
+    if (pathname === "/dashboard") {
+      return supabaseResponse
+    }
     if (!isAuthPage) {
-      const url = request.nextUrl.clone()
-      url.pathname = "/login"
-      return NextResponse.redirect(url)
+      return redirectTo(request, "/login") || supabaseResponse
     }
     return supabaseResponse
   }
 
-  // Auth sayfasındayken giriş yapılmışsa dashboard'a yönlendir
+  const isAdmin = profile.role === "admin"
+  if (isResetPasswordPage) {
+    return supabaseResponse
+  }
+
   if (isAuthPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = profile.role === "admin" ? "/admin/dashboard" : "/dashboard"
-    return NextResponse.redirect(url)
+    if (isAdmin) {
+      return redirectTo(request, "/admin/dashboard") || supabaseResponse
+    }
+    return supabaseResponse
   }
 
-  // Rol bazlı route kontrolü
-  if (profile.role === "admin" && !isAdminPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/admin/dashboard"
-    return NextResponse.redirect(url)
+  if (isAdmin && !isAdminPage) {
+    return redirectTo(request, "/admin/dashboard") || supabaseResponse
   }
 
-  if (profile.role !== "admin" && isAdminPage) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/dashboard"
-    return NextResponse.redirect(url)
+  if (!isAdmin && isAdminPage) {
+    return redirectTo(request, "/dashboard") || supabaseResponse
   }
 
   return supabaseResponse
