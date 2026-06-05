@@ -18,7 +18,7 @@ export default async function AdminLayout({
     .eq("id", user.id)
     .single()
 
-  if (!profile || profile.role !== "admin") redirect("/login")
+  if (!profile || profile.role !== "admin" || !profile.is_active) redirect("/login")
 
   return <AppShell profile={profile}>{children}</AppShell>
 }

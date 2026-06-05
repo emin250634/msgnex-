@@ -343,7 +343,13 @@ class NetgsmProvider implements SmsProvider {
 }
 
 export function createSmsProvider(): SmsProvider {
-  const provider = (process.env.SMS_PROVIDER || "fake").toLowerCase()
+  const configuredProvider = process.env.SMS_PROVIDER?.trim().toLowerCase()
+  if (!configuredProvider && process.env.NODE_ENV === "production") {
+    throw new Error("Production ortamında SMS_PROVIDER zorunludur")
+  }
+
+  const provider = configuredProvider || "fake"
   if (provider === "netgsm") return new NetgsmProvider()
-  return new FakeSmsProvider()
+  if (provider === "fake") return new FakeSmsProvider()
+  throw new Error(`Desteklenmeyen SMS provider: ${provider}`)
 }

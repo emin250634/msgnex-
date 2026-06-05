@@ -38,7 +38,14 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = authPages.includes(pathname)
   const isResetPasswordPage = pathname === "/reset-password"
   const isAdminPage = pathname.startsWith("/admin")
-  const isPublicPage = pathname === "/" || pathname.startsWith("/api/") || pathname.startsWith("/auth/callback")
+  const isPublicPage =
+    pathname === "/" ||
+    pathname === "/demo-request" ||
+    pathname === "/privacy" ||
+    pathname === "/kvkk" ||
+    pathname === "/terms" ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/auth/callback")
 
   if (isPublicPage) return supabaseResponse
 

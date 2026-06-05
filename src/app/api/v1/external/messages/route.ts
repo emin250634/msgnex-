@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { createSmsProvider } from "@/services/sms-provider"
-import type { SendSmsResult } from "@/services/sms-provider"
+import type { SendSmsResult, SmsProvider } from "@/services/sms-provider"
 import { MAX_SMS_LENGTH } from "@/lib/sms-segments"
 
 const requestSchema = z.object({
@@ -46,6 +46,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Gecerli bir telefon numarasi girin" }, { status: 400 })
   }
 
+  let provider: SmsProvider
+  try {
+    provider = createSmsProvider()
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Provider ayarlari eksik" },
+      { status: 503 }
+    )
+  }
+
   const apiKeyHash = createHash("sha256").update(apiKey).digest("hex")
   const supabase = await createClient()
   const { data: dispatch, error: dispatchError } = await supabase.rpc("create_api_sms_dispatch", {
@@ -64,7 +74,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Bu istek halen isleniyor" }, { status: 409 })
   }
 
-  const provider = createSmsProvider()
   let providerResults: SendSmsResult[]
   try {
     providerResults = await provider.sendBulkSms(

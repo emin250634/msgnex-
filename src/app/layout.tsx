@@ -3,8 +3,20 @@ import "./globals.css"
 import { Toaster } from "react-hot-toast"
 
 export const metadata: Metadata = {
-  title: "Msgnex - B2B Toplu SMS Platformu",
-  description: "Kurumsal toplu SMS gönderim platformu",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  title: {
+    default: "MSGNEX | Kurumsal SMS ve İletişim Platformu",
+    template: "%s | MSGNEX",
+  },
+  description: "Toplu SMS, SMS API, kampanya yönetimi, raporlama ve provider entegrasyonlarını tek panelden yönetin.",
+  openGraph: {
+    title: "MSGNEX | Kurumsal SMS ve İletişim Platformu",
+    description: "Kurumsal SMS operasyonlarınızı güvenli ve kontrollü biçimde tek panelden yönetin.",
+    type: "website",
+    locale: "tr_TR",
+    images: [{ url: "/background.png", width: 1678, height: 944, alt: "MSGNEX iletişim platformu" }],
+  },
+  icons: { icon: "/logo.png", apple: "/logo.png" },
 }
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import type { Session } from "@supabase/supabase-js"
 import { createClient } from "@/lib/supabase/client"
@@ -11,7 +11,7 @@ import toast from "react-hot-toast"
 
 const invalidLinkMessage = "Davet veya şifre sıfırlama bağlantısı geçersiz ya da süresi dolmuş. Lütfen yeni bağlantı isteyin."
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams()
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -198,5 +198,13 @@ export default function ResetPasswordPage() {
         </Button>
       </form>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="h-96 animate-pulse rounded-xl bg-slate-100" />}>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }

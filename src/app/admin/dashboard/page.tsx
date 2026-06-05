@@ -106,8 +106,8 @@ export default async function AdminDashboard() {
           </div>
           <div className="rounded-xl bg-emerald-50 p-4">
             <p className="text-sm font-semibold text-emerald-800">Sistem Sağlığı</p>
-            <p className="mt-2 text-3xl font-semibold text-emerald-900">Aktif</p>
-            <p className="mt-1 text-xs text-emerald-700">Panel ve operasyon izleme hazır</p>
+            <p className="mt-2 text-3xl font-semibold text-emerald-900">Panel Hazır</p>
+            <p className="mt-1 text-xs text-emerald-700">Provider bağlantısı ayrıca doğrulanmalıdır</p>
           </div>
         </div>
       </Card>
@@ -141,14 +141,14 @@ export default async function AdminDashboard() {
         <Card title="Provider Durumu">
           <div className="space-y-4">
             {[
-              ["NETGSM", "Aktif", smsCount ?? 0, Math.max((smsCount ?? 0) - (providerFailedCount ?? 0), 0), providerFailedCount ?? 0],
-              ["DLR Servisi", "Hazır", awaitingDlrCount ?? 0, Math.max((awaitingDlrCount ?? 0) - (providerFailedCount ?? 0), 0), providerFailedCount ?? 0],
-              ["Gönderim Kuyruğu", "Aktif", campaignCount ?? 0, Math.max((campaignCount ?? 0) - (reviewRequiredCount ?? 0), 0), reviewRequiredCount ?? 0],
+              ["NETGSM", "Firma ayarı bekleniyor", smsCount ?? 0, Math.max((smsCount ?? 0) - (providerFailedCount ?? 0), 0), providerFailedCount ?? 0],
+              ["DLR Servisi", "Entegrasyon bekleniyor", awaitingDlrCount ?? 0, Math.max((awaitingDlrCount ?? 0) - (providerFailedCount ?? 0), 0), providerFailedCount ?? 0],
+              ["Gönderim Kuyruğu", "Worker doğrulaması gerekli", campaignCount ?? 0, Math.max((campaignCount ?? 0) - (reviewRequiredCount ?? 0), 0), reviewRequiredCount ?? 0],
             ].map(([label, status, total, success, fail]) => (
               <div key={label} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 rounded-xl border border-gray-100 p-4 text-sm">
                 <div>
                   <p className="font-semibold text-gray-950">{label}</p>
-                  <StatusBadge label={String(status)} tone="success" className="mt-2" />
+                  <StatusBadge label={String(status)} tone="warning" className="mt-2" />
                 </div>
                 <div className="text-right"><p className="text-xs text-gray-500">Gönderim</p><p className="font-semibold text-gray-900">{Number(total)}</p></div>
                 <div className="text-right"><p className="text-xs text-gray-500">Başarılı</p><p className="font-semibold text-emerald-700">{Number(success)}</p></div>

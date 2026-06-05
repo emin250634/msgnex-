@@ -33,6 +33,7 @@ type IconName =
   | "credits"
   | "logs"
   | "suspension"
+  | "demo"
 
 const customerNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
@@ -53,6 +54,7 @@ const customerNav: NavItem[] = [
 const adminNav: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: "dashboard" },
   { label: "Firmalar", href: "/admin/companies", icon: "companies" },
+  { label: "Demo Talepleri", href: "/admin/demo-requests", icon: "demo" },
   { label: "Kullanıcılar", href: "/admin/users", icon: "users" },
   { label: "Kredi Yönetimi", href: "/admin/credits", icon: "credits" },
   { label: "Gönderim Kayıtları", href: "/admin/logs", icon: "logs" },
@@ -214,5 +216,7 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M9 8h6" /><path d="M9 12h6" /><path d="M9 16h3" /></svg>
     case "suspension":
       return <svg {...common}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /><path d="M12 15v2" /></svg>
+    case "demo":
+      return <svg {...common}><path d="M4 5h16v12H4z" /><path d="m8 21 4-4 4 4" /><path d="M8 9h8" /><path d="M8 13h5" /></svg>
   }
 }

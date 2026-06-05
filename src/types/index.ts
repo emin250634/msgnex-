@@ -193,3 +193,23 @@ export interface CompanyInvitation {
   created_at: string
   updated_at: string
 }
+
+export interface DemoRequest {
+  id: string
+  full_name: string
+  company_name: string
+  phone: string
+  email: string
+  monthly_sms_volume: string
+  message: string | null
+  status: "new" | "contacted" | "approved" | "rejected"
+  approved_at: string | null
+  rejected_at: string | null
+  company_id: string | null
+  invitation_id: string | null
+  rejection_reason: string | null
+  last_email_sent_at: string | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createSmsProvider } from "@/services/sms-provider"
-import type { SendSmsResult } from "@/services/sms-provider"
+import type { SendSmsResult, SmsProvider } from "@/services/sms-provider"
 
 const requestSchema = z.object({
   maxCampaigns: z.number().int().min(1).max(20).default(5),
@@ -36,7 +36,15 @@ export async function POST(request: Request) {
     )
   }
 
-  const provider = createSmsProvider()
+  let provider: SmsProvider
+  try {
+    provider = createSmsProvider()
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Provider ayarları eksik" },
+      { status: 503 }
+    )
+  }
   const processed: unknown[] = []
   const { data: flaggedCount, error: staleError } = await supabase.rpc(
     "flag_stale_sending_campaigns",
