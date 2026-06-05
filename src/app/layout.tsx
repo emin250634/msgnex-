@@ -3,13 +3,17 @@ import "./globals.css"
 import { Toaster } from "react-hot-toast"
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL("https://msgnex.com"),
+  alternates: {
+    canonical: "/",
+  },
   title: {
     default: "MSGNEX | Kurumsal SMS ve İletişim Platformu",
     template: "%s | MSGNEX",
   },
   description: "Toplu SMS, SMS API, kampanya yönetimi, raporlama ve provider entegrasyonlarını tek panelden yönetin.",
   openGraph: {
+    url: "/",
     title: "MSGNEX | Kurumsal SMS ve İletişim Platformu",
     description: "Kurumsal SMS operasyonlarınızı güvenli ve kontrollü biçimde tek panelden yönetin.",
     type: "website",

@@ -2,6 +2,18 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 const authPages = ["/login", "/register", "/reset-password"]
+const publicPages = new Set([
+  "/",
+  "/demo-request",
+  "/register",
+  "/privacy",
+  "/kvkk",
+  "/terms",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/favicon.ico",
+  "/opengraph-image",
+])
 
 function redirectTo(request: NextRequest, pathname: string) {
   if (request.nextUrl.pathname === pathname) return null
@@ -39,11 +51,8 @@ export async function updateSession(request: NextRequest) {
   const isResetPasswordPage = pathname === "/reset-password"
   const isAdminPage = pathname.startsWith("/admin")
   const isPublicPage =
-    pathname === "/" ||
-    pathname === "/demo-request" ||
-    pathname === "/privacy" ||
-    pathname === "/kvkk" ||
-    pathname === "/terms" ||
+    publicPages.has(pathname) ||
+    pathname.startsWith("/_next/") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/auth/callback")
 
