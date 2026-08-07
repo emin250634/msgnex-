@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createSmsProvider } from "@/services/sms-provider"
+import { decryptProviderSecret } from "@/lib/security/provider-secret"
+import { createNetgsmProvider, createTestSmsProvider } from "@/services/sms-provider"
 import type { SendSmsResult, SmsProvider } from "@/services/sms-provider"
 
 const requestSchema = z.object({
@@ -13,6 +14,35 @@ function isAuthorized(request: Request): boolean {
   const workerSecret = process.env.WORKER_SECRET
   const authorization = request.headers.get("authorization")
   return Boolean(workerSecret && authorization === `Bearer ${workerSecret}`)
+}
+
+async function createProviderForCompany(
+  supabase: ReturnType<typeof createAdminClient>,
+  companyId: string
+): Promise<SmsProvider> {
+  const { data: setting, error } = await supabase
+    .from("company_provider_settings")
+    .select("provider_name, is_active, usercode, encrypted_secret, sender_header, timeout_ms, encoding")
+    .eq("company_id", companyId)
+    .eq("provider_name", "netgsm")
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!setting || !setting.is_active || !setting.usercode || !setting.encrypted_secret || !setting.sender_header) {
+    throw new Error("Firma Netgsm provider bağlantısı aktif değil")
+  }
+
+  if (setting.encoding === "TEST") {
+    return createTestSmsProvider()
+  }
+
+  return createNetgsmProvider({
+    userCode: setting.usercode,
+    password: decryptProviderSecret(setting.encrypted_secret),
+    defaultHeader: setting.sender_header,
+    timeoutMs: setting.timeout_ms,
+    encoding: setting.encoding,
+  })
 }
 
 export async function POST(request: Request) {
@@ -36,15 +66,6 @@ export async function POST(request: Request) {
     )
   }
 
-  let provider: SmsProvider
-  try {
-    provider = createSmsProvider()
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Provider ayarları eksik" },
-      { status: 503 }
-    )
-  }
   const processed: unknown[] = []
   const { data: flaggedCount, error: staleError } = await supabase.rpc(
     "flag_stale_sending_campaigns",
@@ -57,8 +78,10 @@ export async function POST(request: Request) {
     if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 })
     if (!campaign) break
 
+    let provider: SmsProvider
     let providerResults: SendSmsResult[]
     try {
+      provider = await createProviderForCompany(supabase, campaign.company_id)
       providerResults = await provider.sendBulkSms(
         campaign.messages.map((message: { recipient: string }) => message.recipient),
         campaign.message,

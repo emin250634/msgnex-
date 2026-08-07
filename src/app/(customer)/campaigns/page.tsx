@@ -76,7 +76,7 @@ function dateOnly(value?: string | null) {
   return value.slice(0, 10)
 }
 
-function estimatedCampaignCredits(campaign: SmsCampaign) {
+function estimatedProviderUnits(campaign: SmsCampaign) {
   return campaign.total_recipients * calculateSmsSegments(campaign.message).segments
 }
 
@@ -195,7 +195,7 @@ export default function CampaignsPage() {
       return
     }
 
-    toast.success(`${data.refund} kredi iade edildi`)
+    toast.success("Kampanya iptal edildi")
     setCancelTarget(null)
     load()
   }
@@ -422,14 +422,14 @@ export default function CampaignsPage() {
             <div className="space-y-5">
               <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
                 <p className="text-lg font-semibold text-red-950">Bu kampanya iptal edilecek</p>
-                <p className="mt-1">İptal işlemi yalnızca kuyruktaki kampanyalar için uygulanır. Ayrılan kredi bakiyeye iade edilir.</p>
+                <p className="mt-1">İptal işlemi yalnızca henüz provider&apos;a gönderilmemiş kuyruktaki kampanyalar için uygulanır.</p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <CancelMetric label="Etkilenecek kişi" value={`${cancelTarget.total_recipients} kişi`} />
                 <CancelMetric label="Atlanan kişi" value={`${cancelTarget.skipped_recipients ?? 0} kişi`} />
                 <CancelMetric label="Mesaj parçası" value={`${calculateSmsSegments(cancelTarget.message).segments} parça`} />
-                <CancelMetric label="Kullanılacak / ayrılan kredi" value={`${estimatedCampaignCredits(cancelTarget)} kredi`} />
+                <CancelMetric label="Tahmini provider kullanımı" value={`${estimatedProviderUnits(cancelTarget)} SMS parçası`} />
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">

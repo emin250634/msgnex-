@@ -47,13 +47,6 @@ function campaignStatusTone(status: string) {
   return "info" as const
 }
 
-function txTypeLabel(type: string) {
-  if (type === "refund") return "İade"
-  if (type === "deduct") return "Kullanım"
-  if (type === "purchase") return "Satın Alma"
-  return "Yükleme"
-}
-
 function MiniTrend({ tone = "blue" }: { tone?: "blue" | "green" | "orange" | "purple" }) {
   const colors = {
     blue: "bg-blue-500",
@@ -96,7 +89,9 @@ export default async function CustomerDashboard() {
   const activeCompanyId = activeMembership?.company_id
 
   let companyName = "-"
-  let creditsBalance = 0
+  let providerName = "Netgsm"
+  let providerStatus = "Kurulum bekliyor"
+  let providerReady = false
   let contactCount = 0
   let segmentCount = 0
   let vipCustomerCount = 0
@@ -108,7 +103,6 @@ export default async function CustomerDashboard() {
   let recentMessages: any[] = []
   let recentFailedMessages: any[] = []
   let recentCampaigns: any[] = []
-  let recentTransactions: any[] = []
 
   if (activeCompanyId) {
     const { data: company } = await supabase
@@ -118,12 +112,11 @@ export default async function CustomerDashboard() {
       .single()
     companyName = company?.name || "-"
 
-    const { data: credits } = await supabase
-      .from("sms_credits")
-      .select("balance")
-      .eq("company_id", activeCompanyId)
-      .single()
-    creditsBalance = credits?.balance ?? 0
+    const { data: providerRows } = await supabase.rpc("get_customer_provider_status")
+    const provider = providerRows?.[0]
+    providerName = provider?.provider_name || "Netgsm"
+    providerReady = Boolean(provider?.has_provider && provider.sender_header && provider.connection_status !== "disabled")
+    providerStatus = providerReady ? "Hazır" : "Kurulum bekliyor"
 
     const { count: contactsTotal } = await supabase
       .from("contacts")
@@ -200,13 +193,6 @@ export default async function CustomerDashboard() {
       .limit(5)
     recentCampaigns = campaigns ?? []
 
-    const { data: transactions } = await supabase
-      .from("credit_transactions")
-      .select("*")
-      .eq("company_id", activeCompanyId)
-      .order("created_at", { ascending: false })
-      .limit(5)
-    recentTransactions = transactions ?? []
   }
 
   const successRate = recentMessages.length > 0
@@ -228,10 +214,10 @@ export default async function CustomerDashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        {creditsBalance < 100 && (
+        {!providerReady && (
           <Link href="/balance" className="rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
-            <p className="text-sm font-semibold text-amber-900">Düşük bakiye</p>
-            <p className="mt-1 text-sm text-amber-800">Kalan kredi {creditsBalance}. Gönderim kesintisi yaşamamak için bakiye kontrolü önerilir.</p>
+            <p className="text-sm font-semibold text-amber-900">Provider kurulumu bekliyor</p>
+            <p className="mt-1 text-sm text-amber-800">SMS gönderimi için firmanızın Netgsm bağlantısı tamamlanmalıdır.</p>
           </Link>
         )}
         {awaitingDlrCount > 0 && (
@@ -243,7 +229,7 @@ export default async function CustomerDashboard() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
-        <StatCard title="Bakiye" value={creditsBalance} description="Kullanılabilir SMS kredisi" tone="blue" icon={<span className="font-semibold">₺</span>} trend={<MiniTrend tone="blue" />} />
+        <StatCard title="Provider" value={providerName} description={providerStatus} tone="blue" icon={<span className="font-semibold">API</span>} trend={<MiniTrend tone="blue" />} />
         <StatCard title="Kişiler" value={contactCount} description="Toplam kayıtlı kişi" tone="emerald" icon={<span className="font-semibold">KŞ</span>} trend={<MiniTrend tone="green" />} />
         <StatCard title="Kampanyalar" value={campaignCount} description="Toplam kampanya" tone="slate" icon={<span className="font-semibold">KP</span>} trend={<MiniTrend tone="purple" />} />
         <StatCard title="Teslimat Oranı" value={`%${successRate}`} description="Son kayıtlar üzerinden özet" tone="amber" icon={<span className="font-semibold">OK</span>} trend={<MiniTrend tone="orange" />} />
@@ -342,7 +328,7 @@ export default async function CustomerDashboard() {
             <QuickAction href="/groups" label="Grup Oluştur" icon="●" />
             <QuickAction href="/templates" label="Şablon Oluştur" icon="✎" />
             <QuickAction href="/campaigns" label="Kampanyalar" icon="▤" />
-            <QuickAction href="/balance" label="Bakiye" icon="₺" />
+            <QuickAction href="/balance" label="Provider Bağlantısı" icon="API" />
           </div>
         </Card>
       </div>
@@ -360,26 +346,6 @@ export default async function CustomerDashboard() {
           </div>
         ) : (
           <EmptyState title="Hatalı gönderim yok" description="Son hatalı gönderimler oluştuğunda burada görünecek." action={<Link href="/history"><Button variant="secondary">Geçmişi Aç</Button></Link>} />
-        )}
-      </Card>
-
-      <Card title="Son Kredi Hareketleri">
-        {recentTransactions.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {recentTransactions.map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-950">{txTypeLabel(transaction.type)}</p>
-                  <p className="mt-1 truncate text-xs text-gray-500">{transaction.note || formatDate(transaction.created_at)}</p>
-                </div>
-                <p className={transaction.amount >= 0 ? "text-sm font-semibold text-emerald-700" : "text-sm font-semibold text-red-700"}>
-                  {transaction.amount > 0 ? "+" : ""}{transaction.amount}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="Kredi hareketi yok" description="Kredi işlemleri burada görünecek." />
         )}
       </Card>
     </div>

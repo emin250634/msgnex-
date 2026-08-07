@@ -186,7 +186,7 @@ function DashboardMockup() {
           <div className="min-w-0 bg-[#f6f8fc] p-4 text-slate-950 sm:p-5">
             <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-semibold text-blue-700">OPERASYON ÖZETİ</p><p className="mt-1 text-base font-semibold">Genel Bakış</p></div><span className="rounded-md bg-blue-600 px-3 py-2 text-[9px] font-semibold text-white">SMS Gönder</span></div>
             <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[["Gönderim", "24.860", "blue"], ["İletildi", "%96,8", "green"], ["Kampanya", "18", "navy"], ["Bakiye", "8.420", "amber"]].map(([label, value, tone]) => (
+              {[["Gönderim", "24.860", "blue"], ["İletildi", "%96,8", "green"], ["Kampanya", "18", "navy"], ["Provider", "Netgsm", "amber"]].map(([label, value, tone]) => (
                 <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm"><span className={`block h-1.5 w-6 rounded-full ${tone === "green" ? "bg-emerald-500" : tone === "amber" ? "bg-amber-500" : tone === "navy" ? "bg-slate-800" : "bg-blue-600"}`} /><p className="mt-3 text-[9px] text-slate-500">{label}</p><p className="mt-1 text-base font-semibold">{value}</p></div>
               ))}
             </div>

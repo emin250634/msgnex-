@@ -266,7 +266,7 @@ export default function HistoryPage() {
               <Th>Final</Th>
               <Th>Teslim/Hata</Th>
               <Th>DLR Son Kontrol</Th>
-              <Th>Kredi</Th>
+              <Th>SMS Parçası</Th>
             </Tr>
           </THead>
           <TBody>

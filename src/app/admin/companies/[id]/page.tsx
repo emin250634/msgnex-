@@ -25,6 +25,7 @@ interface ProviderSettingsResponse {
     is_active: boolean
     timeout_ms: number | null
     encoding: string | null
+    is_test_mode: boolean
     has_secret: boolean
     secret_last_changed_at: string | null
     created_at: string | null
@@ -47,6 +48,7 @@ interface ProviderFormState {
   timeoutMs: string
   encoding: string
   isActive: boolean
+  isTestMode: boolean
 }
 
 interface CompanyUserRow {
@@ -112,8 +114,9 @@ function formFromSettings(data: ProviderSettingsResponse): ProviderFormState {
     secret: "",
     senderHeader: settings.sender_header || "",
     timeoutMs: String(settings.timeout_ms || 15000),
-    encoding: settings.encoding || "TR",
+    encoding: settings.is_test_mode ? "TEST" : settings.encoding || "TR",
     isActive: settings.is_active,
+    isTestMode: Boolean(settings.is_test_mode),
   }
 }
 
@@ -129,6 +132,7 @@ export default function AdminCompanyDetailPage() {
     timeoutMs: "15000",
     encoding: "TR",
     isActive: false,
+    isTestMode: false,
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -186,6 +190,9 @@ export default function AdminCompanyDetailPage() {
 
   const providerHealth = useMemo(() => {
     if (!settings?.is_active) return { label: "Hazır değil", tone: "warning" as const }
+    if (settings.encoding === "TEST") {
+      return { label: "Test Modu Hazır", tone: "success" as const }
+    }
     if (settings.connection_status === "connected" && settings.sender_header_status === "approved") {
       return { label: "Gönderime Hazır", tone: "success" as const }
     }
@@ -194,11 +201,11 @@ export default function AdminCompanyDetailPage() {
 
   const providerChecklist = useMemo(() => [
     { label: "Provider kaydı", done: hasProviderRecord },
-    { label: "Netgsm usercode kaydı", done: Boolean(settings?.usercode) },
-    { label: "Encrypted secret kaydı", done: Boolean(settings?.has_secret) },
+    { label: settings?.encoding === "TEST" ? "Test provider seçili" : "Netgsm usercode kaydı", done: Boolean(settings?.usercode) },
+    { label: settings?.encoding === "TEST" ? "Test secret kaydı" : "Encrypted secret kaydı", done: Boolean(settings?.has_secret) },
     { label: "Başlık bilgisi", done: Boolean(settings?.sender_header) },
     { label: "Bakiye senkronizasyonu", done: Boolean(wallet?.last_synced_at) },
-  ], [hasProviderRecord, settings?.has_secret, settings?.sender_header, settings?.usercode, wallet?.last_synced_at])
+  ], [hasProviderRecord, settings?.encoding, settings?.has_secret, settings?.sender_header, settings?.usercode, wallet?.last_synced_at])
 
   const handleSave = async () => {
     setSaving(true)
@@ -212,6 +219,7 @@ export default function AdminCompanyDetailPage() {
         timeout_ms: Number(form.timeoutMs),
         encoding: form.encoding,
         is_active: form.isActive,
+        is_test_mode: form.isTestMode,
       }),
     })
 
@@ -312,11 +320,11 @@ export default function AdminCompanyDetailPage() {
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
         <p className="font-semibold">Bu fazda yalnızca güvenli okuma/kayıt/güncelleme aktiftir.</p>
-        <p>Test bağlantısı, başlık sorgulama, bakiye yenileme ve worker credential entegrasyonu henüz yapılmaz.</p>
+        <p>Gerçek Netgsm hesabı olmadan uçtan uca deneme için test modu kullanılabilir. Test modu gerçek SMS göndermez.</p>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Sağlayıcı" value={hasProviderRecord ? "Netgsm" : "Henüz bağlanmadı"} description="Firma bazlı provider" tone="slate" icon={<span className="font-semibold">NG</span>} />
+        <StatCard title="Sağlayıcı" value={settings?.encoding === "TEST" ? "Test Provider" : hasProviderRecord ? "Netgsm" : "Henüz bağlanmadı"} description="Firma bazlı provider" tone="slate" icon={<span className="font-semibold">NG</span>} />
         <StatCard title="Bağlantı" value={connectionLabel(settings?.connection_status)} description="Test bağlantısı bu fazda yok" tone={settings?.connection_status === "connected" ? "emerald" : "amber"} icon={<span className="font-semibold">API</span>} />
         <StatCard title="Netgsm Bakiyesi" value={wallet ? wallet.balance.toLocaleString("tr-TR") : "-"} description={wallet ? `${wallet.balance_unit || "sms"} / ${wallet.currency || "TRY"}` : "Sync yok"} tone="slate" icon={<span className="font-semibold">₺</span>} />
         <StatCard title="Provider Sağlığı" value={providerHealth.label} description="Connected test yapılmadan hazır sayılmaz" tone={providerHealth.tone === "success" ? "emerald" : "amber"} icon={<span className="font-semibold">ST</span>} />
@@ -346,12 +354,13 @@ export default function AdminCompanyDetailPage() {
 
         <div className="grid gap-6 pt-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Sağlayıcı" value={hasProviderRecord ? "Netgsm" : "Henüz bağlanmadı"} />
+            <Field label="Sağlayıcı" value={form.isTestMode ? "Test Provider" : hasProviderRecord ? "Netgsm" : "Henüz bağlanmadı"} />
             <Field label="Durum" badge={<StatusBadge label={settings?.is_active ? "Aktif" : "Pasif"} tone={settings?.is_active ? "success" : "neutral"} />} />
             <EditableField
               label="Usercode"
               value={form.usercode}
-              placeholder="Henüz girilmedi"
+              placeholder={form.isTestMode ? "Test modunda otomatik" : "Henüz girilmedi"}
+              disabled={form.isTestMode}
               onChange={(value) => setForm((state) => ({ ...state, usercode: value }))}
             />
             <SecretField
@@ -363,7 +372,7 @@ export default function AdminCompanyDetailPage() {
             <EditableField
               label="Sender Header"
               value={form.senderHeader}
-              placeholder="Henüz girilmedi"
+              placeholder={form.isTestMode ? "Örn: MSGNEX" : "Henüz girilmedi"}
               maxLength={11}
               onChange={(value) => setForm((state) => ({ ...state, senderHeader: value.toUpperCase() }))}
             />
@@ -376,6 +385,7 @@ export default function AdminCompanyDetailPage() {
               label="Encoding"
               value={form.encoding}
               placeholder="TR"
+              disabled={form.isTestMode}
               onChange={(value) => setForm((state) => ({ ...state, encoding: value }))}
             />
             <EditableField
@@ -399,6 +409,30 @@ export default function AdminCompanyDetailPage() {
 
             <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
               <p className="text-sm font-semibold text-gray-950">Aktiflik</p>
+              <label className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <input
+                  type="checkbox"
+                  checked={form.isTestMode}
+                  onChange={(event) => {
+                    const enabled = event.target.checked
+                    setForm((state) => ({
+                      ...state,
+                      isTestMode: enabled,
+                      isActive: enabled ? true : state.isActive,
+                      usercode: enabled ? "MSGNEX_TEST" : state.usercode === "MSGNEX_TEST" ? "" : state.usercode,
+                      senderHeader: enabled && !state.senderHeader ? "MSGNEX" : state.senderHeader,
+                      encoding: enabled ? "TEST" : "TR",
+                    }))
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-amber-300"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-amber-950">Test modu</span>
+                  <span className="mt-1 block text-xs leading-5 text-amber-800">
+                    Worker gerçek Netgsm yerine fake provider kullanır. Gerçek SMS gitmez.
+                  </span>
+                </span>
+              </label>
               <label className="mt-4 flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4">
                 <input
                   type="checkbox"
@@ -409,7 +443,7 @@ export default function AdminCompanyDetailPage() {
                 <span>
                   <span className="block text-sm font-semibold text-gray-950">Provider aktif olsun</span>
                   <span className="mt-1 block text-xs leading-5 text-gray-500">
-                    Kaydedilse bile bağlantı testi yapılmadığı için durum connected olmaz.
+                    Test modunda kayıt otomatik hazır sayılır. Gerçek Netgsm modunda bağlantı testi ayrıca yapılmalıdır.
                   </span>
                 </span>
               </label>
@@ -559,6 +593,7 @@ function EditableField({
   placeholder,
   maxLength,
   type = "text",
+  disabled = false,
   onChange,
 }: {
   label: string
@@ -566,6 +601,7 @@ function EditableField({
   placeholder: string
   maxLength?: number
   type?: string
+  disabled?: boolean
   onChange: (value: string) => void
 }) {
   return (
@@ -577,6 +613,7 @@ function EditableField({
         value={value}
         maxLength={maxLength}
         placeholder={placeholder}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>

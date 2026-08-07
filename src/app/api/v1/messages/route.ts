@@ -43,8 +43,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     campaignId: campaign.campaign_id,
     status: "queued",
-    reservedCredits: campaign.reserved_credits,
+    estimatedProviderUnits: campaign.estimated_provider_units ?? campaign.reserved_credits,
     skippedRecipients: campaign.skipped_recipients,
-    balance: campaign.balance,
   })
 }

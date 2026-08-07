@@ -89,6 +89,16 @@ class FakeSmsProvider implements SmsProvider {
   }
 }
 
+export interface NetgsmProviderConfig {
+  endpoint?: string | null
+  userCode: string
+  password: string
+  defaultHeader?: string | null
+  appKey?: string | null
+  encoding?: string | null
+  timeoutMs?: number | null
+}
+
 class NetgsmProvider implements SmsProvider {
   private readonly endpoint: string
   private readonly userCode: string
@@ -98,15 +108,17 @@ class NetgsmProvider implements SmsProvider {
   private readonly encoding: string
   private readonly timeoutMs: number
 
-  constructor() {
+  constructor(config?: NetgsmProviderConfig) {
     this.endpoint =
-      process.env.NETGSM_ENDPOINT || "https://api.netgsm.com.tr/sms/send/xml"
-    this.userCode = process.env.NETGSM_USERCODE || ""
-    this.password = process.env.NETGSM_PASSWORD || ""
-    this.defaultHeader = process.env.NETGSM_HEADER || null
-    this.appKey = process.env.NETGSM_APPKEY || null
-    this.encoding = process.env.NETGSM_ENCODING || "TR"
-    this.timeoutMs = Number(process.env.SMS_PROVIDER_TIMEOUT_MS || 15000)
+      config?.endpoint ||
+      process.env.NETGSM_ENDPOINT ||
+      "https://api.netgsm.com.tr/sms/send/xml"
+    this.userCode = config?.userCode || process.env.NETGSM_USERCODE || ""
+    this.password = config?.password || process.env.NETGSM_PASSWORD || ""
+    this.defaultHeader = config?.defaultHeader ?? process.env.NETGSM_HEADER ?? null
+    this.appKey = config?.appKey ?? process.env.NETGSM_APPKEY ?? null
+    this.encoding = config?.encoding || process.env.NETGSM_ENCODING || "TR"
+    this.timeoutMs = Number(config?.timeoutMs || process.env.SMS_PROVIDER_TIMEOUT_MS || 15000)
 
     if (!this.userCode || !this.password) {
       throw new Error("NETGSM_USERCODE ve NETGSM_PASSWORD tanimli degil")
@@ -352,4 +364,12 @@ export function createSmsProvider(): SmsProvider {
   if (provider === "netgsm") return new NetgsmProvider()
   if (provider === "fake") return new FakeSmsProvider()
   throw new Error(`Desteklenmeyen SMS provider: ${provider}`)
+}
+
+export function createNetgsmProvider(config: NetgsmProviderConfig): SmsProvider {
+  return new NetgsmProvider(config)
+}
+
+export function createTestSmsProvider(): SmsProvider {
+  return new FakeSmsProvider()
 }

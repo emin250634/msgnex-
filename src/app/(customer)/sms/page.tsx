@@ -22,13 +22,13 @@ export default function SmsPage() {
   const [manualNumbers, setManualNumbers] = useState("")
   const [message, setMessage] = useState("")
   const [senderId, setSenderId] = useState("")
-  const [balance, setBalance] = useState(0)
   const [loading, setLoading] = useState(false)
   const [queuedCampaignId, setQueuedCampaignId] = useState<string | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState("")
   const [templateName, setTemplateName] = useState("")
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
-  const [senderApproved, setSenderApproved] = useState(false)
+  const [providerReady, setProviderReady] = useState(false)
+  const [providerStatus, setProviderStatus] = useState("Kurulum bekliyor")
   const [confirmAllContacts, setConfirmAllContacts] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
 
@@ -41,9 +41,12 @@ export default function SmsPage() {
       if (profile?.company_id) {
         const { data: company } = await sb.from("companies").select("sender_name, sender_approved").eq("id", profile.company_id).single()
         if (company?.sender_name) setSenderId(company.sender_name)
-        setSenderApproved(company?.sender_approved ?? false)
-        const { data: credits } = await sb.from("sms_credits").select("balance").eq("company_id", profile.company_id).maybeSingle()
-        if (credits) setBalance(credits.balance)
+        const { data: providerData } = await sb.rpc("get_customer_provider_status")
+        const provider = providerData?.[0]
+        if (provider?.sender_header) setSenderId(provider.sender_header)
+        const ready = Boolean(provider?.has_provider && provider.sender_header && provider.connection_status !== "disabled")
+        setProviderReady(ready)
+        setProviderStatus(ready ? "Provider hazır" : "Provider kurulumu bekliyor")
       }
     })
   }, [])
@@ -74,7 +77,7 @@ export default function SmsPage() {
       : groups.find((group) => group.id === selectedGroup)?.name || "Seçili segment"
   const hasAudience = selectedGroup !== NO_SEGMENT || manualRecipients.length > 0
   const requiresAllContactsApproval = selectedGroup === ALL_CONTACTS
-  const canPrepareSend = Boolean(message.trim()) && hasAudience && recipientCount > 0 && cost <= balance && senderApproved && (!requiresAllContactsApproval || confirmAllContacts)
+  const canPrepareSend = Boolean(message.trim()) && hasAudience && recipientCount > 0 && providerReady && (!requiresAllContactsApproval || confirmAllContacts)
 
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplate(id)
@@ -131,12 +134,8 @@ export default function SmsPage() {
       toast.error("Tüm kişilere gönderim için ek onayı işaretleyin")
       return
     }
-    if (cost > balance) {
-      toast.error(`Yetersiz bakiye. ${cost - balance} kredi eksik.`)
-      return
-    }
-    if (!senderApproved) {
-      toast.error("SMS başlığınız onaylanmadan gönderim yapılamaz")
+    if (!providerReady) {
+      toast.error("Provider bağlantısı hazır olmadan gönderim yapılamaz")
       return
     }
     setShowFinalConfirm(true)
@@ -166,10 +165,9 @@ export default function SmsPage() {
       return
     }
 
-    setBalance(data.balance)
     setQueuedCampaignId(data.campaignId)
     setShowFinalConfirm(false)
-    toast.success(`Kampanya kuyruğa alındı. ${data.reservedCredits} kredi rezerve edildi.${data.skippedRecipients ? ` ${data.skippedRecipients} kara listedeki numara atlandı.` : ""}`)
+    toast.success(`Kampanya kuyruğa alındı.${data.skippedRecipients ? ` ${data.skippedRecipients} kara listedeki numara atlandı.` : ""}`)
     setLoading(false)
   }
 
@@ -177,11 +175,11 @@ export default function SmsPage() {
     <div className="space-y-6">
       <PageHeader
         title="SMS Gönder"
-        description="Alıcı seçimi, mesaj içeriği ve kredi özetini kontrol ederek güvenli kampanya oluşturun."
+        description="Alıcı seçimi, mesaj içeriği ve provider bağlantısını kontrol ederek güvenli kampanya oluşturun."
         actions={
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-right">
-            <p className="text-xs font-medium text-blue-700">Kalan Kredi</p>
-            <p className="text-xl font-semibold text-blue-800">{balance}</p>
+            <p className="text-xs font-medium text-blue-700">Provider</p>
+            <p className="text-sm font-semibold text-blue-800">{providerStatus}</p>
           </div>
         }
       />
@@ -277,11 +275,11 @@ export default function SmsPage() {
               <span className="font-mono text-sm font-medium text-gray-900">
                 {senderId || "Henüz tanımlanmadı"}
               </span>
-              <StatusBadge label={senderApproved ? "Onaylı" : "Admin onayı bekliyor"} tone={senderApproved ? "success" : "warning"} />
+              <StatusBadge label={providerReady ? "Provider hazır" : "Kurulum bekliyor"} tone={providerReady ? "success" : "warning"} />
             </div>
-            {!senderApproved && (
+            {!providerReady && (
               <p className="mt-1 text-xs text-amber-600">
-                SMS gönderebilmek için başlığınızın admin tarafından onaylanması gerekir.
+                SMS gönderebilmek için firmanızın Netgsm provider bağlantısı hazır olmalıdır.
               </p>
             )}
           </div>
@@ -327,7 +325,7 @@ export default function SmsPage() {
       <Card title="Gönderim Öncesi Özet">
         <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-5">
           <SummaryItem label="Alıcı sayısı" value={recipientCount.toString()} />
-          <SummaryItem label="Tahmini kredi" value={`${cost} kredi`} emphasize={cost > balance} />
+          <SummaryItem label="Tahmini provider kullanımı" value={`${cost} SMS parçası`} />
           <SummaryItem label="Segment / kaynak" value={selectedGroupName} />
           <SummaryItem label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" />
           <SummaryItem label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
@@ -336,9 +334,6 @@ export default function SmsPage() {
           <p className="text-xs font-semibold uppercase text-gray-500">Mesaj önizleme</p>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{message || "Mesaj içeriği henüz girilmedi."}</p>
         </div>
-        {cost > balance && (
-          <p className="mt-3 text-sm font-medium text-red-600">Yetersiz bakiye. {cost - balance} kredi eksik.</p>
-        )}
       </Card>
 
       {showFinalConfirm && (
@@ -346,7 +341,7 @@ export default function SmsPage() {
           <div className="space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
               <p className="text-lg font-semibold text-blue-950">{recipientCount} kişiye SMS gönderilecek</p>
-              <p className="mt-1">Tahmini {cost} kredi kullanılacak. Kampanya mevcut gönderim akışıyla kuyruğa alınır.</p>
+              <p className="mt-1">Tahmini {cost} SMS parçası provider hesabınız üzerinden kullanılacak. Kampanya kuyruğa alınır.</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={handleSend} disabled={loading}>

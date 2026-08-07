@@ -89,8 +89,6 @@ export async function POST(request: NextRequest) {
       last_error: null,
     }, { onConflict: "company_id,email" })
 
-    await adminClient.from("sms_credits").insert({ company_id: company.id, balance: 0 })
-
     return NextResponse.json({ company_id: company.id })
   } catch (error) {
     return NextResponse.json(

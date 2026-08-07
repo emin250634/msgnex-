@@ -101,12 +101,6 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
     }, { onConflict: "company_id,email" }).select("id").single()
     if (invitationError || !invitation) throw new Error(invitationError?.message || "Davet kaydı oluşturulamadı.")
 
-    const { error: creditError } = await adminClient.from("sms_credits").upsert(
-      { company_id: companyId, balance: 0 },
-      { onConflict: "company_id", ignoreDuplicates: true }
-    )
-    if (creditError) throw new Error(`Başlangıç bakiyesi hazırlanamadı: ${creditError.message}`)
-
     const { data: updated, error: updateError } = await adminClient.from("demo_requests").update({
       status: "approved",
       approved_at: now,

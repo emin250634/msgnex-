@@ -1,10 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { BrandLogo } from "@/components/ui/brand-logo"
-import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils/cn"
 import type { Profile } from "@/types"
 
@@ -26,11 +24,10 @@ type IconName =
   | "queue"
   | "templates"
   | "suppression"
-  | "balance"
+  | "provider"
   | "api"
   | "companies"
   | "users"
-  | "credits"
   | "logs"
   | "suspension"
   | "demo"
@@ -47,7 +44,7 @@ const customerNav: NavItem[] = [
   { label: "Otomasyon Kuyruğu", href: "/automation-queue", icon: "queue" },
   { label: "Şablonlar", href: "/templates", icon: "templates" },
   { label: "Kara Liste", href: "/suppression", icon: "suppression" },
-  { label: "Bakiye", href: "/balance", icon: "balance" },
+  { label: "Provider Bağlantısı", href: "/balance", icon: "provider" },
   { label: "API Anahtarları", href: "/api-keys", icon: "api" },
 ]
 
@@ -56,7 +53,6 @@ const adminNav: NavItem[] = [
   { label: "Firmalar", href: "/admin/companies", icon: "companies" },
   { label: "Demo Talepleri", href: "/admin/demo-requests", icon: "demo" },
   { label: "Kullanıcılar", href: "/admin/users", icon: "users" },
-  { label: "Kredi Yönetimi", href: "/admin/credits", icon: "credits" },
   { label: "Gönderim Kayıtları", href: "/admin/logs", icon: "logs" },
   { label: "Hesap Askıya Alma", href: "/admin/suspension", icon: "suspension" },
 ]
@@ -70,19 +66,6 @@ interface SidebarProps {
 export function Sidebar({ profile, open = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const nav = profile.role === "admin" ? adminNav : customerNav
-  const [balance, setBalance] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (profile.role !== "customer" || !profile.company_id) return
-
-    const supabase = createClient()
-    supabase
-      .from("sms_credits")
-      .select("balance")
-      .eq("company_id", profile.company_id)
-      .maybeSingle()
-      .then(({ data }) => setBalance(data?.balance ?? 0))
-  }, [profile.company_id, profile.role])
 
   const content = (
     <div className="flex h-full flex-col">
@@ -119,31 +102,6 @@ export function Sidebar({ profile, open = false, onClose }: SidebarProps) {
           )
         })}
       </nav>
-
-      {profile.role === "customer" && (
-        <div className="border-t border-white/10 p-4">
-          <Link
-            href="/balance"
-            onClick={onClose}
-            className="block rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition-colors hover:bg-white/[0.09]"
-          >
-            <p className="text-xs font-medium uppercase text-slate-400">Mevcut Bakiye</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-white">
-              {balance ?? "-"}
-              <span className="ml-2 text-sm font-medium text-sky-300">SMS</span>
-            </p>
-            <div className="mt-4 h-2 rounded-full bg-white/10">
-              <div className="h-2 w-2/3 rounded-full bg-gradient-to-r from-blue-500 to-sky-400" />
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-slate-400">Kredi Durumu</span>
-              <span className="rounded-full bg-emerald-500/15 px-2 py-1 font-medium text-emerald-300">
-                {balance && balance > 0 ? "Yeterli" : "Kontrol et"}
-              </span>
-            </div>
-          </Link>
-        </div>
-      )}
     </div>
   )
 
@@ -202,7 +160,7 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M6 3h8l4 4v17H6z" /><path d="M14 3v5h5" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
     case "suppression":
       return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="m8 8 8 8" /></svg>
-    case "balance":
+    case "provider":
       return <svg {...common}><path d="M4 7h16v12H4z" /><path d="M16 7V5H6" /><circle cx="12" cy="13" r="2" /></svg>
     case "api":
       return <svg {...common}><path d="M8 9 4 12l4 3" /><path d="m16 9 4 3-4 3" /><path d="m14 5-4 14" /></svg>
@@ -210,8 +168,6 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M4 21V5h10v16" /><path d="M14 9h6v12" /><path d="M8 9h2" /><path d="M8 13h2" /><path d="M8 17h2" /></svg>
     case "users":
       return <svg {...common}><circle cx="9" cy="8" r="4" /><path d="M2 21a7 7 0 0 1 14 0" /><path d="M17 11a3 3 0 0 1 0 6" /><path d="M22 21a5 5 0 0 0-4-4.9" /></svg>
-    case "credits":
-      return <svg {...common}><path d="M12 3v18" /><path d="M17 7H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6" /></svg>
     case "logs":
       return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M9 8h6" /><path d="M9 12h6" /><path d="M9 16h3" /></svg>
     case "suspension":

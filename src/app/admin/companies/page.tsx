@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
-import type { Company, SmsCredit } from "@/types"
+import type { Company } from "@/types"
 
 const companyStatuses = [
   { value: "pending_provider_setup", label: "Provider Bekliyor" },
@@ -33,7 +33,6 @@ function statusTone(status?: string | null, isActive?: boolean) {
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([])
-  const [credits, setCredits] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -47,13 +46,7 @@ export default function CompaniesPage() {
   const load = async () => {
     const supabase = createClient()
     const { data: companies } = await supabase.from("companies").select("*").order("created_at", { ascending: false })
-    const { data: credits } = await supabase.from("sms_credits").select("*")
-    const creditMap: Record<string, number> = {}
-    credits?.forEach((credit: SmsCredit) => {
-      creditMap[credit.company_id] = credit.balance
-    })
     setCompanies(companies ?? [])
-    setCredits(creditMap)
     setLoading(false)
   }
 
@@ -159,7 +152,6 @@ export default function CompaniesPage() {
               <Th>Firma</Th>
               <Th>Telefon</Th>
               <Th>SMS Başlığı</Th>
-              <Th>Kredi</Th>
               <Th>Durum</Th>
               <Th>Aksiyon</Th>
             </Tr>
@@ -174,7 +166,6 @@ export default function CompaniesPage() {
                     {company.sender_name || "Ayarlanmamış"}
                   </span>
                 </Td>
-                <Td><span className="font-bold text-primary-600">{credits[company.id] ?? 0}</span></Td>
                 <Td>
                   <StatusBadge
                     label={statusLabel(company.status, company.is_active)}

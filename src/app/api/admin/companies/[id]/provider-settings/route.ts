@@ -46,6 +46,7 @@ function safeSettings(row?: ProviderSettingsRow | null) {
       is_active: false,
       timeout_ms: 15000,
       encoding: "TR",
+      is_test_mode: false,
       has_secret: false,
       secret_last_changed_at: null,
       created_at: null,
@@ -62,6 +63,7 @@ function safeSettings(row?: ProviderSettingsRow | null) {
     is_active: row.is_active,
     timeout_ms: row.timeout_ms,
     encoding: row.encoding,
+    is_test_mode: row.encoding === "TEST",
     has_secret: Boolean(row.encrypted_secret),
     secret_last_changed_at: row.secret_last_changed_at,
     created_at: row.created_at,
@@ -155,11 +157,14 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const usercode = String(body.usercode ?? "").trim()
     const secret = String(body.secret ?? "").trim()
     const senderHeader = String(body.sender_header ?? "").trim().toUpperCase()
-    const encoding = String(body.encoding ?? "TR").trim() || "TR"
+    const isTestMode = Boolean(body.is_test_mode)
+    const encoding = isTestMode ? "TEST" : String(body.encoding ?? "TR").trim() || "TR"
     const timeoutMs = Number(body.timeout_ms ?? 15000)
     const requestedActive = Boolean(body.is_active)
+    const effectiveUsercode = isTestMode ? "MSGNEX_TEST" : usercode
+    const effectiveSecret = isTestMode && !secret ? "msgnex-test-provider-secret" : secret
 
-    if (!usercode) return validationError("Usercode zorunludur")
+    if (!effectiveUsercode) return validationError("Usercode zorunludur")
     if (!senderHeader) return validationError("Sender header zorunludur")
     if (senderHeader.length > 11) return validationError("Sender header en fazla 11 karakter olabilir")
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return validationError("Timeout pozitif bir sayı olmalıdır")
@@ -176,21 +181,23 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
 
     const hasExistingSecret = Boolean(existing?.encrypted_secret)
-    if (!existing && !secret) {
+    if (!existing && !effectiveSecret) {
       return validationError("Yeni provider kaydı için secret zorunludur")
     }
-    if (requestedActive && !secret && !hasExistingSecret) {
+    if (requestedActive && !effectiveSecret && !hasExistingSecret) {
       return validationError("Provider aktif edilebilmesi için secret zorunludur")
     }
 
-    const encryptedSecret = secret ? encryptProviderSecret(secret) : existing?.encrypted_secret
-    const isActive = requestedActive && Boolean(usercode && senderHeader && encryptedSecret)
-    const connectionStatus = isActive ? "not_configured" : "disabled"
+    const encryptedSecret = effectiveSecret ? encryptProviderSecret(effectiveSecret) : existing?.encrypted_secret
+    const isActive = requestedActive && Boolean(effectiveUsercode && senderHeader && encryptedSecret)
+    const connectionStatus = isActive ? (isTestMode ? "connected" : "not_configured") : "disabled"
+    const senderHeaderStatus = isTestMode && isActive ? "approved" : "unknown"
 
     if (existing?.id) {
       const updatePayload: Record<string, unknown> = {
-        usercode,
+        usercode: effectiveUsercode,
         sender_header: senderHeader,
+        sender_header_status: senderHeaderStatus,
         encoding,
         timeout_ms: timeoutMs,
         is_active: isActive,
@@ -198,7 +205,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         updated_by: userId,
       }
 
-      if (secret) {
+      if (effectiveSecret) {
         updatePayload.encrypted_secret = encryptedSecret
         updatePayload.secret_last_changed_at = new Date().toISOString()
       }
@@ -217,11 +224,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         .insert({
           company_id: params.id,
           provider_name: PROVIDER_NAME,
-          usercode,
+          usercode: effectiveUsercode,
           encrypted_secret: encryptedSecret,
           secret_last_changed_at: new Date().toISOString(),
           sender_header: senderHeader,
-          sender_header_status: "unknown",
+          sender_header_status: senderHeaderStatus,
           connection_status: connectionStatus,
           is_active: isActive,
           encoding,

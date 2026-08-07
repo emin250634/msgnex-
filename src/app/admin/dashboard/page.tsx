@@ -181,7 +181,7 @@ export default async function AdminDashboard() {
         <Card title="Hızlı İşlemler">
           <div className="grid gap-3 sm:grid-cols-2">
             <QuickAction href="/admin/companies" label="Firma Yönetimi" icon="+" />
-            <QuickAction href="/admin/credits" label="Kredi Yönetimi" icon="₺" />
+            <QuickAction href="/admin/demo-requests" label="Demo Talepleri" icon="DT" />
             <QuickAction href="/admin/logs" label="Gönderim Kayıtları" icon="▤" />
             <QuickAction href="/admin/users" label="Kullanıcılar" icon="◎" />
           </div>

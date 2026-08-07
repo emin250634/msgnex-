@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
-import toast from "react-hot-toast"
 
 export default function LogsPage() {
   const [messages, setMessages] = useState<any[]>([])
@@ -76,7 +75,7 @@ export default function LogsPage() {
               <Th>Alıcı</Th>
               <Th>Mesaj</Th>
               <Th>Durum</Th>
-              <Th>Kredi</Th>
+              <Th>SMS Parçası</Th>
               <Th>Tarih</Th>
             </Tr>
           </THead>
