@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
+import { writeAuditLog } from "@/lib/audit-log"
 
 interface RouteContext {
   params: {
@@ -60,7 +61,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
 
-    const { adminClient } = auth.context
+    const { adminClient, profile, userId } = auth.context
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
@@ -102,6 +103,19 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     for (const userId of userIds) {
       await deleteUserIfOrphan(adminClient, userId, params.id)
     }
+
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: profile.role,
+      action: "company.delete",
+      targetType: "company",
+      targetId: params.id,
+      companyId: params.id,
+      metadata: {
+        affected_user_count: userIds.length,
+      },
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {

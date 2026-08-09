@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
+import { writeAuditLog } from "@/lib/audit-log"
 
 interface RouteContext {
   params: {
@@ -12,7 +13,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
 
-    const { adminClient, userId } = auth.context
+    const { adminClient, profile: actorProfile, userId } = auth.context
     if (params.id === userId) {
       return NextResponse.json({ error: "Kendi admin kullanicinizi silemezsiniz" }, { status: 400 })
     }
@@ -40,6 +41,18 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       await adminClient.from("company_invitations").delete().eq("user_id", params.id)
       await adminClient.from("profiles").delete().eq("id", params.id)
     }
+
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: actorProfile.role,
+      action: "user.delete",
+      targetType: "user",
+      targetId: params.id,
+      metadata: {
+        deleted_user_role: profile.role,
+      },
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {

@@ -112,14 +112,21 @@ Başlanan işler:
   - kara listede atlanacak numara sayısı
   - kullanılacak provider başlığı
   - tahmini sağlayıcı kredi kullanımı
+- Audit log altyapısı başlatıldı:
+  - provider ayarı kaydetme
+  - provider bağlantı/başlık/kredi sorguları
+  - firma silme
+  - kullanıcı silme
+  - firma kullanıcı rol/aktiflik değişimi
+  - firma kullanıcı üyeliği silme
 
 Yapılacaklar:
 
 - KVKK/izinli iletişim ekranlarını güçlendirmek.
 - Kara liste yönetimini daha görünür hale getirmek.
 - İçe aktarılan kişiler için izin durumu alanı eklemek.
-- Firma bazlı audit log ekranı oluşturmak.
-- Kritik admin işlemlerini audit log'a yazmak.
+- Firma bazlı audit log filtrelerini geliştirmek.
+- Kritik admin işlemleri kapsamını genişletmek.
 - Provider secret değişimlerini maskelemek ve geçmişini göstermek.
 - Kampanya gönderiminden önce risk özeti göstermek:
   - toplam alıcı

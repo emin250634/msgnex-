@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { writeAuditLog } from "@/lib/audit-log"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { decryptProviderSecret, encryptProviderSecret } from "@/lib/security/provider-secret"
 import { createNetgsmProvider, createTestSmsProvider } from "@/services/sms-provider"
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
 
-    const { adminClient } = auth.context
+    const { adminClient, profile, userId } = auth.context
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
@@ -232,6 +233,21 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         .eq("id", state.settings?.id)
 
       if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+
+      await writeAuditLog({
+        adminClient,
+        actorUserId: userId,
+        actorRole: profile.role,
+        action: "provider.test_connection",
+        targetType: "company_provider_settings",
+        targetId: state.settings?.id ?? null,
+        companyId: params.id,
+        metadata: {
+          provider_name: PROVIDER_NAME,
+          ok: result.ok,
+          status_code: result.statusCode ?? null,
+        },
+      })
 
       return stateResponse(await readProviderState(adminClient, params.id), {
         action,
@@ -280,6 +296,22 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
       if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
 
+      await writeAuditLog({
+        adminClient,
+        actorUserId: userId,
+        actorRole: profile.role,
+        action: "provider.query_headers",
+        targetType: "company_provider_settings",
+        targetId: state.settings?.id ?? null,
+        companyId: params.id,
+        metadata: {
+          provider_name: PROVIDER_NAME,
+          ok: result.ok,
+          header_count: normalizedHeaders.length,
+          configured_header_status: headerStatus,
+        },
+      })
+
       return stateResponse(await readProviderState(adminClient, params.id), {
         action,
         result,
@@ -316,6 +348,23 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       })
       .eq("id", state.settings?.id)
 
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: profile.role,
+      action: "provider.query_credit",
+      targetType: "company_provider_settings",
+      targetId: state.settings?.id ?? null,
+      companyId: params.id,
+      metadata: {
+        provider_name: PROVIDER_NAME,
+        ok: result.ok,
+        balance: result.amount ?? null,
+        balance_unit: result.unit ?? null,
+        currency: result.currency ?? null,
+      },
+    })
+
     return stateResponse(await readProviderState(adminClient, params.id), {
       action,
       result,
@@ -333,7 +382,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
 
-    const { adminClient, userId } = auth.context
+    const { adminClient, profile, userId } = auth.context
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
@@ -469,6 +518,27 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         .eq("provider_name", PROVIDER_NAME)
         .maybeSingle(),
     ])
+
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: profile.role,
+      action: existing?.id ? "provider.update" : "provider.create",
+      targetType: "company_provider_settings",
+      targetId: (settings as ProviderSettingsRow | null)?.id ?? existing?.id ?? null,
+      companyId: params.id,
+      metadata: {
+        provider_name: PROVIDER_NAME,
+        is_active: isActive,
+        is_test_mode: isTestMode,
+        sender_header: senderHeader || null,
+        sender_header_status: senderHeaderStatus,
+        connection_status: connectionStatus,
+        encoding,
+        timeout_ms: timeoutMs,
+        secret_changed: Boolean(effectiveSecret),
+      },
+    })
 
     return NextResponse.json({
       provider_settings: safeSettings(settings as ProviderSettingsRow | null),

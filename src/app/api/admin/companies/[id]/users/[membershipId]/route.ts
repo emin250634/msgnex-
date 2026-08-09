@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
+import { writeAuditLog } from "@/lib/audit-log"
 
 const COMPANY_ROLES = ["company_owner", "company_admin", "company_user"]
 
@@ -19,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
 
-    const { adminClient } = auth.context
+    const { adminClient, profile, userId } = auth.context
     const body = await request.json()
     const nextRole = body.role === undefined ? undefined : String(body.role).trim()
     const nextActive = body.is_active === undefined ? undefined : Boolean(body.is_active)
@@ -80,6 +81,23 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         .eq("id", membership.user_id)
     }
 
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: profile.role,
+      action: "company_user.update",
+      targetType: "company_user",
+      targetId: membership.id,
+      companyId: params.id,
+      metadata: {
+        user_id: membership.user_id,
+        previous_role: membership.role,
+        next_role: nextRole ?? membership.role,
+        previous_is_active: membership.is_active,
+        next_is_active: nextActive ?? membership.is_active,
+      },
+    })
+
     return NextResponse.json({ ok: true })
   } catch (error) {
     return NextResponse.json(
@@ -94,7 +112,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
 
-    const { adminClient } = auth.context
+    const { adminClient, profile, userId } = auth.context
     const { data: membership, error: membershipError } = await adminClient
       .from("company_users")
       .select("*")
@@ -168,6 +186,21 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
           .eq("id", membership.user_id)
       }
     }
+
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: profile.role,
+      action: "company_user.delete",
+      targetType: "company_user",
+      targetId: membership.id,
+      companyId: params.id,
+      metadata: {
+        user_id: membership.user_id,
+        role: membership.role,
+        was_active: membership.is_active,
+      },
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {
