@@ -59,6 +59,7 @@ export default function WebhooksPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [actionId, setActionId] = useState<string | null>(null)
+  const [revealedSecret, setRevealedSecret] = useState<{ webhookId: string; secret: string; rotatedAt?: string | null } | null>(null)
   const [error, setError] = useState("")
 
   const selectedWebhook = useMemo(() => webhooks.find((item) => item.id === editingId) ?? null, [editingId, webhooks])
@@ -143,12 +144,19 @@ export default function WebhooksPage() {
         p_events: events,
       })
 
-    const { error: saveError } = await rpc
+    const { data: saveData, error: saveError } = await rpc
     setSaving(false)
 
     if (saveError) {
       toast.error(saveError.message)
       return
+    }
+
+    if (!editingId) {
+      const created = Array.isArray(saveData) ? saveData[0] : null
+      if (created?.id && created?.signing_secret) {
+        setRevealedSecret({ webhookId: created.id, secret: created.signing_secret })
+      }
     }
 
     toast.success(editingId ? "Webhook güncellendi" : "Webhook oluşturuldu")
@@ -169,6 +177,33 @@ export default function WebhooksPage() {
 
     toast.success("Webhook silindi")
     if (editingId === id) resetForm()
+    load()
+  }
+
+  const rotateSecret = async (id: string) => {
+    const confirmed = window.confirm("Webhook signing secret yenilenecek. Eski secret'ı entegrasyonunuzda kısa süre kabul edip yeni secret'a geçmeniz gerekir. Devam edilsin mi?")
+    if (!confirmed) return
+
+    setActionId(id)
+    const supabase = createClient()
+    const { data, error: rotateError } = await supabase.rpc("rotate_company_webhook_secret", { p_webhook_id: id })
+    setActionId(null)
+
+    if (rotateError) {
+      toast.error(rotateError.message)
+      return
+    }
+
+    const rotated = Array.isArray(data) ? data[0] : null
+    if (rotated?.id && rotated?.signing_secret) {
+      setRevealedSecret({
+        webhookId: rotated.id,
+        secret: rotated.signing_secret,
+        rotatedAt: rotated.secret_rotated_at ?? null,
+      })
+    }
+
+    toast.success("Webhook secret yenilendi")
     load()
   }
 
@@ -299,6 +334,32 @@ export default function WebhooksPage() {
             </Button>
             {selectedWebhook && <Button variant="secondary" onClick={resetForm} disabled={saving}>Vazgeç</Button>}
           </div>
+
+          {revealedSecret && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+              <p className="font-semibold">Signing secret yalnızca bu ekranda bir kez gösterilir.</p>
+              <p>Endpoint tarafında `X-MSGNEX-Signature` doğrulaması için bu değeri güvenli bir yerde saklayın.</p>
+              <div className="mt-3 flex flex-col gap-2 rounded-lg bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                <code className="break-all text-xs text-gray-950">{revealedSecret.secret}</code>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(revealedSecret.secret)
+                    toast.success("Secret kopyalandı")
+                  }}
+                >
+                  Kopyala
+                </Button>
+              </div>
+              {revealedSecret.rotatedAt && (
+                <p className="mt-2 text-xs text-emerald-800">
+                  Yenileme zamanı: {new Date(revealedSecret.rotatedAt).toLocaleString("tr-TR")}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </Card>
 
@@ -321,11 +382,22 @@ export default function WebhooksPage() {
                         </span>
                       ))}
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-500">
+                      {webhook.secret_rotated_at ? (
+                        <span>Secret yenileme: {new Date(webhook.secret_rotated_at).toLocaleString("tr-TR")}</span>
+                      ) : (
+                        <span>Secret yenileme yapılmadı</span>
+                      )}
+                      {webhook.has_previous_signing_secret && <span>Önceki secret geçiş kaydı mevcut</span>}
+                    </div>
                     {webhook.last_delivery_error && <p className="mt-3 text-sm text-red-700">{webhook.last_delivery_error}</p>}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="secondary" size="sm" disabled={!hasWebhookAccess || actionId === webhook.id || !webhook.is_active} onClick={() => sendTestDelivery(webhook.id)}>
                       {actionId === webhook.id ? "Kuyruğa alınıyor..." : "Test Gönder"}
+                    </Button>
+                    <Button variant="secondary" size="sm" disabled={!hasWebhookAccess || actionId === webhook.id} onClick={() => rotateSecret(webhook.id)}>
+                      {actionId === webhook.id ? "Yenileniyor..." : "Secret Yenile"}
                     </Button>
                     <Button variant="secondary" size="sm" disabled={!hasWebhookAccess} onClick={() => startEdit(webhook)}>Düzenle</Button>
                     <Button variant="danger" size="sm" disabled={!hasWebhookAccess} onClick={() => deleteWebhook(webhook.id)}>Sil</Button>
@@ -415,6 +487,9 @@ export default function WebhooksPage() {
         <div className="space-y-5 text-sm">
           <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 leading-6 text-blue-900">
             MSGNEX webhook isteği `X-MSGNEX-Signature` header&apos;ı ile imzalanır. İmzalanan metin `timestamp.body` formatındadır ve HMAC SHA-256 kullanılır.
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 leading-6 text-amber-900">
+            Signing secret sadece webhook oluşturma veya secret yenileme anında gösterilir. Secret yeniledikten sonra entegrasyonunuzda kısa bir geçiş süresi boyunca eski ve yeni secret&apos;ı birlikte kabul edin; geçiş tamamlanınca eski secret desteğini kaldırın.
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <DocItem label="Event" value="X-MSGNEX-Event" />

@@ -13,6 +13,13 @@ import { PLAN_LABELS } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/client"
 import type { Company } from "@/types"
 
+interface CompanyOnboardingSummary {
+  company_id: string
+  progress: number
+  status: "pilot_ready" | "provider_blocked" | "data_needed" | "test_campaign_needed" | "in_progress"
+  next_step: string
+}
+
 const companyStatuses = [
   { value: "pending_provider_setup", label: "Provider Bekliyor" },
   { value: "pending_review", label: "Inceleme Bekliyor" },
@@ -32,8 +39,46 @@ function statusTone(status?: string | null, isActive?: boolean) {
   return "warning" as const
 }
 
+function onboardingLabel(status: CompanyOnboardingSummary["status"]) {
+  const labels = {
+    pilot_ready: "Pilot Hazır",
+    provider_blocked: "Provider Eksik",
+    data_needed: "Veri Bekliyor",
+    test_campaign_needed: "Test Bekliyor",
+    in_progress: "Kurulum Sürüyor",
+  }
+  return labels[status] || status
+}
+
+function onboardingTone(status: CompanyOnboardingSummary["status"]) {
+  if (status === "pilot_ready") return "success" as const
+  if (status === "provider_blocked") return "danger" as const
+  if (status === "data_needed" || status === "test_campaign_needed") return "warning" as const
+  return "info" as const
+}
+
+function salesStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    new: "Yeni",
+    contacted: "Görüşüldü",
+    pilot: "Pilot",
+    won: "Kazanıldı",
+    lost: "Kaybedildi",
+  }
+  return labels[status || "new"] || status || "Yeni"
+}
+
+function salesStatusTone(status?: string | null) {
+  if (status === "won") return "success" as const
+  if (status === "lost") return "danger" as const
+  if (status === "pilot") return "info" as const
+  if (status === "contacted") return "warning" as const
+  return "neutral" as const
+}
+
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([])
+  const [onboarding, setOnboarding] = useState<Record<string, CompanyOnboardingSummary>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -48,8 +93,12 @@ export default function CompaniesPage() {
 
   const load = async () => {
     const supabase = createClient()
-    const { data: companies } = await supabase.from("companies").select("*").order("created_at", { ascending: false })
+    const [{ data: companies }, { data: onboardingRows }] = await Promise.all([
+      supabase.from("companies").select("*").order("created_at", { ascending: false }),
+      supabase.rpc("list_admin_company_onboarding"),
+    ])
     setCompanies(companies ?? [])
+    setOnboarding(Object.fromEntries(((onboardingRows ?? []) as CompanyOnboardingSummary[]).map((row) => [row.company_id, row])))
     setLoading(false)
   }
 
@@ -189,39 +238,63 @@ export default function CompaniesPage() {
               <Th>Firma</Th>
               <Th>Telefon</Th>
               <Th>Plan</Th>
+              <Th>Satış</Th>
+              <Th>Onboarding</Th>
               <Th>Durum</Th>
               <Th>Aksiyon</Th>
             </Tr>
           </THead>
           <TBody>
-            {companies.map((company) => (
-              <Tr key={company.id}>
-                <Td className="font-medium">{company.name}</Td>
-                <Td>{company.phone || "-"}</Td>
-                <Td>{PLAN_LABELS[company.plan || "starter"]}</Td>
-                <Td>
-                  <StatusBadge
-                    label={statusLabel(company.status, company.is_active)}
-                    tone={statusTone(company.status, company.is_active)}
-                  />
-                </Td>
-                <Td>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={`/admin/companies/${company.id}`}>
-                      <Button variant="secondary" size="sm">Detay</Button>
-                    </Link>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={deletingId === company.id}
-                      onClick={() => handleDelete(company)}
-                    >
-                      {deletingId === company.id ? "Siliniyor..." : "Sil"}
-                    </Button>
-                  </div>
-                </Td>
-              </Tr>
-            ))}
+            {companies.map((company) => {
+              const summary = onboarding[company.id]
+              return (
+                <Tr key={company.id}>
+                  <Td className="font-medium">{company.name}</Td>
+                  <Td>{company.phone || "-"}</Td>
+                  <Td>{PLAN_LABELS[company.plan || "starter"]}</Td>
+                  <Td>
+                    <div className="min-w-32">
+                      <StatusBadge label={salesStatusLabel(company.sales_status)} tone={salesStatusTone(company.sales_status)} />
+                      {company.expected_monthly_sms_volume && (
+                        <p className="mt-1 text-xs text-gray-500">{company.expected_monthly_sms_volume}/ay</p>
+                      )}
+                    </div>
+                  </Td>
+                  <Td>
+                    {summary ? (
+                      <div className="min-w-40">
+                        <div className="flex items-center gap-2">
+                          <StatusBadge label={onboardingLabel(summary.status)} tone={onboardingTone(summary.status)} />
+                          <span className="text-sm font-semibold text-gray-700">%{summary.progress}</span>
+                        </div>
+                        <p className="mt-1 max-w-56 truncate text-xs text-gray-500">{summary.next_step}</p>
+                      </div>
+                    ) : "-"}
+                  </Td>
+                  <Td>
+                    <StatusBadge
+                      label={statusLabel(company.status, company.is_active)}
+                      tone={statusTone(company.status, company.is_active)}
+                    />
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={`/admin/companies/${company.id}`}>
+                        <Button variant="secondary" size="sm">Detay</Button>
+                      </Link>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        disabled={deletingId === company.id}
+                        onClick={() => handleDelete(company)}
+                      >
+                        {deletingId === company.id ? "Siliniyor..." : "Sil"}
+                      </Button>
+                    </div>
+                  </Td>
+                </Tr>
+              )
+            })}
           </TBody>
         </Table>
       </Card>

@@ -14,6 +14,7 @@ interface NavItem {
 
 type IconName =
   | "dashboard"
+  | "setup"
   | "send"
   | "campaigns"
   | "history"
@@ -27,6 +28,7 @@ type IconName =
   | "provider"
   | "api"
   | "webhook"
+  | "notifications"
   | "plan"
   | "companies"
   | "users"
@@ -36,6 +38,7 @@ type IconName =
 
 const customerNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  { label: "Kurulum", href: "/setup", icon: "setup" },
   { label: "SMS Gönder", href: "/sms", icon: "send" },
   { label: "Kampanyalar", href: "/campaigns", icon: "campaigns" },
   { label: "Gönderim Geçmişi", href: "/history", icon: "history" },
@@ -48,7 +51,10 @@ const customerNav: NavItem[] = [
   { label: "Kara Liste", href: "/suppression", icon: "suppression" },
   { label: "Provider Bağlantısı", href: "/provider", icon: "provider" },
   { label: "API Anahtarları", href: "/api-keys", icon: "api" },
+  { label: "API Rehberi", href: "/api-guide", icon: "api" },
   { label: "Webhooks", href: "/webhooks", icon: "webhook" },
+  { label: "Bildirimler", href: "/notifications", icon: "notifications" },
+  { label: "Audit Logları", href: "/audit-logs", icon: "logs" },
   { label: "Planım", href: "/plan", icon: "plan" },
 ]
 
@@ -145,6 +151,8 @@ function NavIcon({ name }: { name: IconName }) {
   switch (name) {
     case "dashboard":
       return <svg {...common}><path d="M4 13h7V4H4z" /><path d="M13 20h7V4h-7z" /><path d="M4 20h7v-5H4z" /></svg>
+    case "setup":
+      return <svg {...common}><path d="M12 3v3" /><path d="M12 18v3" /><path d="M4.2 7.5 6.8 9" /><path d="m17.2 15 2.6 1.5" /><path d="m4.2 16.5 2.6-1.5" /><path d="m17.2 9 2.6-1.5" /><circle cx="12" cy="12" r="4" /><path d="m10.8 12.2.9.9 1.8-2.2" /></svg>
     case "send":
       return <svg {...common}><path d="M4 12 20 4l-6 16-3-7z" /><path d="m11 13 4-4" /></svg>
     case "campaigns":
@@ -171,6 +179,8 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M8 9 4 12l4 3" /><path d="m16 9 4 3-4 3" /><path d="m14 5-4 14" /></svg>
     case "webhook":
       return <svg {...common}><path d="M7 7h4v4H7z" /><path d="M13 13h4v4h-4z" /><path d="M11 9h3a3 3 0 0 1 3 3v1" /><path d="M13 15h-3a3 3 0 0 1-3-3v-1" /><path d="M4 12h3" /><path d="M17 12h3" /></svg>
+    case "notifications":
+      return <svg {...common}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>
     case "plan":
       return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8 8h8" /><path d="M8 12h8" /><path d="M8 16h4" /></svg>
     case "companies":

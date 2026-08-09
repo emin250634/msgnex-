@@ -23,6 +23,10 @@ export interface Company {
   is_active: boolean
   sender_name: string
   sender_approved: boolean
+  sales_status: "new" | "contacted" | "pilot" | "won" | "lost"
+  pilot_started_at: string | null
+  expected_monthly_sms_volume: string | null
+  sales_note: string | null
   created_at: string
   updated_at: string
 }
@@ -52,6 +56,29 @@ export interface CustomerApiKey {
   last_used_at: string | null
   created_at: string
   revoked_at: string | null
+}
+
+export interface ApiKeyUsage {
+  key_id: string
+  total_requests: number
+  requests_last_24h: number
+  completed_requests: number
+  processing_requests: number
+  successful_messages: number
+  failed_messages: number
+  last_request_at: string | null
+}
+
+export interface CompanyAuditLog {
+  id: string
+  actor_user_id: string | null
+  actor_role: string | null
+  actor_name: string
+  action: string
+  target_type: string
+  target_id: string | null
+  metadata: unknown
+  created_at: string
 }
 
 export interface CreditTransaction {
@@ -241,6 +268,8 @@ export interface CompanyWebhook {
   endpoint_url: string
   events: string[]
   is_active: boolean
+  has_previous_signing_secret: boolean
+  secret_rotated_at: string | null
   last_delivery_status: "pending" | "success" | "failed" | null
   last_delivery_error: string | null
   last_delivered_at: string | null

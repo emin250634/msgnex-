@@ -14,6 +14,11 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleString("tr-TR")
 }
 
+function percent(part: number, total: number) {
+  if (total <= 0) return 0
+  return Math.round((part / total) * 100)
+}
+
 function messageStatusLabel(status: string) {
   if (status === "sent") return "Gönderildi"
   if (status === "delivered") return "Teslim edildi"
@@ -94,19 +99,37 @@ export default async function CustomerDashboard() {
   let providerName = "Netgsm"
   let providerStatus = "Kurulum bekliyor"
   let providerReady = false
+  let providerConnectionStatus = "not_configured"
+  let providerSenderHeader: string | null = null
+  let providerSenderHeaderStatus = "unknown"
+  let providerBalance: number | null = null
+  let providerBalanceUnit = "sms"
+  let providerLastSyncedAt: string | null = null
   let contactCount = 0
+  let optedInCount = 0
+  let optedOutCount = 0
+  let unknownConsentCount = 0
+  let suppressionCount = 0
   let segmentCount = 0
   let vipCustomerCount = 0
   let emailCustomerCount = 0
   let campaignCount = 0
+  let campaignsLast30Count = 0
   let awaitingDlrCount = 0
   let providerFailedCount = 0
   let reviewRequiredCount = 0
+  let messagesLast30Count = 0
+  let sentMessagesLast30Count = 0
+  let deliveredMessagesLast30Count = 0
+  let failedMessagesLast30Count = 0
+  let pendingMessagesLast30Count = 0
   let recentMessages: any[] = []
   let recentFailedMessages: any[] = []
   let recentCampaigns: any[] = []
 
   if (activeCompanyId) {
+    const last30Start = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
+
     const { data: company } = await supabase
       .from("companies")
       .select("name, plan")
@@ -118,14 +141,33 @@ export default async function CustomerDashboard() {
     const { data: providerRows } = await supabase.rpc("get_customer_provider_status")
     const provider = providerRows?.[0]
     providerName = provider?.provider_name || "Netgsm"
+    providerConnectionStatus = provider?.connection_status || "not_configured"
+    providerSenderHeader = provider?.sender_header || null
+    providerSenderHeaderStatus = provider?.sender_header_status || "unknown"
+    providerBalance = typeof provider?.balance === "number" ? provider.balance : provider?.balance ? Number(provider.balance) : null
+    providerBalanceUnit = provider?.balance_unit || "sms"
+    providerLastSyncedAt = provider?.last_synced_at || null
     providerReady = Boolean(provider?.has_provider && provider.sender_header && provider.connection_status !== "disabled")
     providerStatus = providerReady ? "Hazır" : "Kurulum bekliyor"
 
-    const { count: contactsTotal } = await supabase
-      .from("contacts")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
+    const [
+      { count: contactsTotal },
+      { count: optedInTotal },
+      { count: optedOutTotal },
+      { count: unknownConsentTotal },
+      { count: suppressionTotal },
+    ] = await Promise.all([
+      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId),
+      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("consent_status", "opted_in"),
+      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("consent_status", "opted_out"),
+      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("consent_status", "unknown"),
+      supabase.from("suppression_list").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId),
+    ])
     contactCount = contactsTotal ?? 0
+    optedInCount = optedInTotal ?? 0
+    optedOutCount = optedOutTotal ?? 0
+    unknownConsentCount = unknownConsentTotal ?? 0
+    suppressionCount = suppressionTotal ?? 0
 
     const { data: crmContacts } = await supabase
       .from("contacts")
@@ -150,6 +192,13 @@ export default async function CustomerDashboard() {
       .eq("company_id", activeCompanyId)
     campaignCount = campaignsTotal ?? 0
 
+    const { count: campaignsLast30 } = await supabase
+      .from("sms_campaigns")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", activeCompanyId)
+      .gte("created_at", last30Start)
+    campaignsLast30Count = campaignsLast30 ?? 0
+
     const { count: awaitingDlr } = await supabase
       .from("sms_campaigns")
       .select("*", { count: "exact", head: true })
@@ -170,6 +219,25 @@ export default async function CustomerDashboard() {
       .eq("company_id", activeCompanyId)
       .eq("status", "review_required")
     reviewRequiredCount = reviewRequired ?? 0
+
+    const [
+      { count: messagesLast30 },
+      { count: sentMessagesLast30 },
+      { count: deliveredMessagesLast30 },
+      { count: failedMessagesLast30 },
+      { count: pendingMessagesLast30 },
+    ] = await Promise.all([
+      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).gte("created_at", last30Start),
+      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "sent").gte("created_at", last30Start),
+      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "delivered").gte("created_at", last30Start),
+      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "failed").gte("created_at", last30Start),
+      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "pending").gte("created_at", last30Start),
+    ])
+    messagesLast30Count = messagesLast30 ?? 0
+    sentMessagesLast30Count = sentMessagesLast30 ?? 0
+    deliveredMessagesLast30Count = deliveredMessagesLast30 ?? 0
+    failedMessagesLast30Count = failedMessagesLast30 ?? 0
+    pendingMessagesLast30Count = pendingMessagesLast30 ?? 0
 
     const { data: messages } = await supabase
       .from("sms_messages")
@@ -198,9 +266,24 @@ export default async function CustomerDashboard() {
 
   }
 
-  const successRate = recentMessages.length > 0
-    ? Math.round((recentMessages.filter((message) => message.status === "sent" || message.status === "delivered").length / recentMessages.length) * 100)
-    : 0
+  const successRate = percent(sentMessagesLast30Count + deliveredMessagesLast30Count, messagesLast30Count)
+  const failedRate = percent(failedMessagesLast30Count, messagesLast30Count)
+  const consentRate = percent(optedInCount, contactCount)
+  const providerChecklist = [
+    { label: "Provider kaydı", done: providerConnectionStatus !== "not_configured" && providerConnectionStatus !== "disabled" },
+    { label: "Onaylı başlık", done: Boolean(providerSenderHeader) && providerSenderHeaderStatus !== "rejected" },
+    { label: "Bağlantı aktif", done: providerReady },
+    { label: "Bakiye senkronu", done: Boolean(providerLastSyncedAt) },
+  ]
+  const healthIssues = [
+    !providerReady ? "Provider bağlantısı tamamlanmadı" : null,
+    optedOutCount > 0 ? `${optedOutCount} izinsiz kişi gönderimden çıkarılır` : null,
+    unknownConsentCount > 0 ? `${unknownConsentCount} kişinin izin durumu bilinmiyor` : null,
+    suppressionCount > 0 ? `${suppressionCount} kara liste kaydı aktif` : null,
+    failedMessagesLast30Count > 0 ? `Son 30 günde ${failedMessagesLast30Count} hatalı SMS var` : null,
+    awaitingDlrCount > 0 ? `${awaitingDlrCount} kampanya DLR bekliyor` : null,
+    reviewRequiredCount > 0 ? `${reviewRequiredCount} kampanya inceleme gerektiriyor` : null,
+  ].filter(Boolean) as string[]
 
   return (
     <div className="space-y-7">
@@ -223,33 +306,48 @@ export default async function CustomerDashboard() {
             <p className="mt-1 text-sm text-amber-800">SMS gönderimi için firmanızın Netgsm bağlantısı tamamlanmalıdır.</p>
           </Link>
         )}
+        {failedMessagesLast30Count > 0 && (
+          <Link href="/campaigns" className="rounded-xl border border-red-200 bg-red-50 p-4 transition-colors hover:bg-red-100">
+            <p className="text-sm font-semibold text-red-900">Temizlik bekleyen hatalar</p>
+            <p className="mt-1 text-sm text-red-800">Son 30 günde {failedMessagesLast30Count} hatalı SMS var. Kampanya raporundan temizlik akışını başlatın.</p>
+          </Link>
+        )}
         {awaitingDlrCount > 0 && (
           <Link href="/campaigns" className="rounded-xl border border-blue-200 bg-blue-50 p-4 transition-colors hover:bg-blue-100">
             <p className="text-sm font-semibold text-blue-900">DLR bekleyen kampanya</p>
             <p className="mt-1 text-sm text-blue-800">{awaitingDlrCount} kampanya teslimat raporu bekliyor.</p>
           </Link>
         )}
+        <Link href="/notifications" className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50">
+          <p className="text-sm font-semibold text-gray-950">Bildirim Merkezi</p>
+          <p className="mt-1 text-sm text-gray-600">{healthIssues.length > 0 ? `${healthIssues.length} operasyon uyarısı gözden geçirilebilir.` : "Kritik uyarı görünmüyor."}</p>
+        </Link>
+        <Link href="/setup" className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50">
+          <p className="text-sm font-semibold text-gray-950">Kurulum Checklist</p>
+          <p className="mt-1 text-sm text-gray-600">Pilot başlangıç adımlarını tek akışta takip edin.</p>
+        </Link>
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
         <StatCard title="Plan" value={PLAN_LABELS[companyPlan]} description="Yazılım paketi" tone="slate" icon={<span className="font-semibold">PL</span>} trend={<MiniTrend tone="purple" />} />
         <StatCard title="Provider" value={providerName} description={providerStatus} tone="blue" icon={<span className="font-semibold">API</span>} trend={<MiniTrend tone="blue" />} />
         <StatCard title="Kişiler" value={contactCount} description="Toplam kayıtlı kişi" tone="emerald" icon={<span className="font-semibold">KŞ</span>} trend={<MiniTrend tone="green" />} />
-        <StatCard title="Kampanyalar" value={campaignCount} description="Toplam kampanya" tone="slate" icon={<span className="font-semibold">KP</span>} trend={<MiniTrend tone="purple" />} />
+        <StatCard title="Son 30 Gün" value={campaignsLast30Count} description={`${campaignCount} toplam kampanya`} tone="slate" icon={<span className="font-semibold">30</span>} trend={<MiniTrend tone="purple" />} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <DashboardMetric title="VIP Müşteri" value={vipCustomerCount} description="VIP segmentindeki kayıtlar" tone="purple" />
-        <DashboardMetric title="Segmentler" value={segmentCount} description="Aktif grup/segment sayısı" tone="info" />
-        <DashboardMetric title="Çok Kanallı Kayıt" value={emailCustomerCount} description="E-posta bilgisi bulunan kişiler" tone="success" />
+      <div className="grid gap-4 md:grid-cols-4">
+        <DashboardMetric title="İzinli Kişi" value={optedInCount} description={`İzin oranı %${consentRate}`} tone="success" />
+        <DashboardMetric title="İzinsiz Kişi" value={optedOutCount} description="Gönderimden çıkarılır" tone="danger" />
+        <DashboardMetric title="Kara Liste" value={suppressionCount} description="Otomatik atlanan numara" tone="warning" />
+        <DashboardMetric title="Segmentler" value={segmentCount} description={`${vipCustomerCount} VIP, ${emailCustomerCount} e-postalı`} tone="info" />
       </div>
 
       <Card>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatusMetric title="DLR Bekleyen" value={awaitingDlrCount} description="Teslimat raporu bekleyen" tone="red" />
-          <StatusMetric title="Provider Hatası" value={providerFailedCount} description="Hata alan kampanyalar" tone="orange" />
-          <StatusMetric title="İnceleme Gereken" value={reviewRequiredCount} description="Operasyon kontrolü gereken" tone="violet" />
-          <StatusMetric title="Teslimat Oranı" value={`%${successRate}`} description="Son kayıtlar üzerinden özet" tone="emerald" />
+          <StatusMetric title="Son 30 Gün SMS" value={messagesLast30Count} description={`${pendingMessagesLast30Count} bekleyen kayıt`} tone="violet" />
+          <StatusMetric title="Başarı Oranı" value={`%${successRate}`} description={`${sentMessagesLast30Count + deliveredMessagesLast30Count} başarılı kayıt`} tone="emerald" />
+          <StatusMetric title="Hata Oranı" value={`%${failedRate}`} description={`${failedMessagesLast30Count} hatalı SMS`} tone={failedMessagesLast30Count > 0 ? "red" : "emerald"} />
+          <StatusMetric title="DLR Bekleyen" value={awaitingDlrCount} description={`${providerFailedCount} provider hatalı kampanya`} tone="orange" />
         </div>
       </Card>
 
@@ -279,21 +377,49 @@ export default async function CustomerDashboard() {
           )}
         </Card>
 
-        <Card title="Provider Durumu">
+        <Card title="Operasyon Sağlığı">
           <div className="space-y-4">
-            {[
-              ["Provider", "Henüz yapılandırılmadı", "Firma bazlı Netgsm bağlantısı backend entegrasyonu sonrası gösterilecek."],
-              ["DLR", "Gerçek bağlantı bekleniyor", "Teslimat raporu görünümü provider/DLR worker bağlandıktan sonra aktif olacak."],
-              ["Gönderim Kuyruğu", "Sistem hazır, provider bekleniyor", "Kampanya kuyruğu mevcut; canlı gönderim için firma provider ayarı gerekir."],
-            ].map(([label, status, description]) => (
-              <div key={label} className="grid gap-3 rounded-xl border border-gray-100 p-4 text-sm md:grid-cols-[1fr_auto] md:items-center">
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="font-semibold text-gray-950">{label}</p>
-                  <p className="mt-1 text-sm text-gray-500">{description}</p>
+                  <p className="text-sm font-semibold text-gray-950">Provider Hazırlığı</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {providerSenderHeader ? `${providerSenderHeader} başlığı ile gönderim hazırlanıyor.` : "Gönderici başlığı henüz hazır görünmüyor."}
+                  </p>
                 </div>
-                <StatusBadge label={String(status)} tone="warning" />
+                <StatusBadge label={providerReady ? "Hazır" : "Eksik"} tone={providerReady ? "success" : "warning"} />
               </div>
-            ))}
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {providerChecklist.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm">
+                    <span className="text-gray-700">{item.label}</span>
+                    <StatusBadge label={item.done ? "Tamam" : "Eksik"} tone={item.done ? "success" : "warning"} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <InfoBox title="Provider Bakiyesi" value={providerBalance === null ? "-" : providerBalance.toLocaleString("tr-TR")} description={providerBalance === null ? "Sağlayıcıdan henüz sorgulanmadı" : providerBalanceUnit} />
+              <InfoBox title="Son Senkron" value={formatDate(providerLastSyncedAt)} description="Provider bakiye/başlık görünürlüğü" />
+            </div>
+
+            {healthIssues.length > 0 ? (
+              <div className="space-y-2">
+                {healthIssues.slice(0, 4).map((issue) => (
+                  <div key={issue} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    {issue}
+                  </div>
+                ))}
+                <Link href="/notifications" className="inline-flex text-sm font-semibold text-blue-700 hover:text-blue-900">
+                  Tüm bildirimleri aç
+                </Link>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                Operasyon görünümünde kritik uyarı yok.
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -355,7 +481,7 @@ export default async function CustomerDashboard() {
   )
 }
 
-function DashboardMetric({ title, value, description, tone }: { title: string; value: number; description: string; tone: "purple" | "info" | "success" }) {
+function DashboardMetric({ title, value, description, tone }: { title: string; value: number; description: string; tone: "purple" | "info" | "success" | "danger" | "warning" }) {
   return (
     <Card>
       <div className="flex items-start justify-between gap-4">
@@ -367,6 +493,16 @@ function DashboardMetric({ title, value, description, tone }: { title: string; v
         <StatusBadge label="CRM" tone={tone} />
       </div>
     </Card>
+  )
+}
+
+function InfoBox({ title, value, description }: { title: string; value: string; description: string }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4">
+      <p className="text-xs font-semibold uppercase text-gray-500">{title}</p>
+      <p className="mt-2 text-xl font-semibold text-gray-950">{value}</p>
+      <p className="mt-1 text-xs text-gray-500">{description}</p>
+    </div>
   )
 }
 

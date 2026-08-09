@@ -6,6 +6,8 @@
  * this module because provider credentials belong on the server.
  */
 
+import { getProviderErrorInfo } from "@/lib/provider-errors"
+
 export interface SendSmsParams {
   recipient: string
   message: string
@@ -543,20 +545,8 @@ class NetgsmProvider implements SmsProvider {
   }
 
   private errorMessage(code: string, rawResponse: string): string {
-    const messages: Record<string, string> = {
-      "20": "Mesaj metni veya mesaj boyu gecersiz",
-      "30": "Gecersiz Netgsm kullanici bilgisi veya API yetkisi",
-      "40": "Gecersiz Netgsm mesaj basligi",
-      "41": "Gecersiz Netgsm mesaj basligi",
-      "50": "Gecersiz alici numarasi",
-      "51": "Gecersiz alici numarasi",
-      "52": "Gecersiz alici numarasi",
-      "60": "Netgsm hesap paketi uygun degil",
-      "70": "Netgsm input parametreleri gecersiz",
-      "100": "Netgsm sistem hatasi",
-    }
-
-    return messages[code] || `Netgsm hatasi (${code}): ${rawResponse}`
+    const info = getProviderErrorInfo("netgsm", code)
+    return info ? info.title : `Netgsm hatasi (${code}): ${rawResponse}`
   }
 
   private escapeXml(value: string): string {

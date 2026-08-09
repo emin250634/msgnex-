@@ -75,6 +75,13 @@ function hasTag(contact: Contact, group: Group | null, filter: TagFilter) {
   return true
 }
 
+function normalizePhoneForCompare(phone?: string | null) {
+  const digits = (phone || "").replace(/\D/g, "")
+  if (digits.length === 12 && digits.startsWith("90")) return digits.slice(2)
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1)
+  return digits
+}
+
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [groups, setGroups] = useState<Group[]>([])
@@ -85,6 +92,7 @@ export default function ContactsPage() {
   const [groupFilter, setGroupFilter] = useState("all")
   const [tagFilter, setTagFilter] = useState<TagFilter>("all")
   const [consentFilter, setConsentFilter] = useState<"all" | ConsentStatus>("all")
+  const [cleanupPhones, setCleanupPhones] = useState<string[]>([])
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Partial<Contact>>({})
@@ -154,11 +162,27 @@ export default function ContactsPage() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("cleanup") !== "failed-campaign") return
+
+    try {
+      const stored = JSON.parse(sessionStorage.getItem("msgnex_failed_cleanup_phones") || "[]")
+      if (Array.isArray(stored)) {
+        setCleanupPhones(Array.from(new Set(stored.map((phone) => normalizePhoneForCompare(String(phone))).filter(Boolean))))
+      }
+    } catch {
+      setCleanupPhones([])
+    }
+  }, [])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
 
     return contacts.filter((contact) => {
       const group = contact.group_id ? groupMap.get(contact.group_id) ?? null : null
+      const normalizedPhone = normalizePhoneForCompare(contact.phone)
       const searchable = [
         contact.first_name,
         contact.last_name,
@@ -168,14 +192,15 @@ export default function ContactsPage() {
       ].filter(Boolean).join(" ").toLowerCase()
 
       const matchesSearch = !q || searchable.includes(q)
+      const matchesCleanup = cleanupPhones.length === 0 || cleanupPhones.includes(normalizedPhone)
       const matchesGroup =
         groupFilter === "all" ||
         (groupFilter === "unassigned" ? !contact.group_id : contact.group_id === groupFilter)
       const matchesConsent = consentFilter === "all" || contact.consent_status === consentFilter
 
-      return matchesSearch && matchesGroup && matchesConsent && hasTag(contact, group, tagFilter)
+      return matchesCleanup && matchesSearch && matchesGroup && matchesConsent && hasTag(contact, group, tagFilter)
     })
-  }, [consentFilter, contacts, groupFilter, groupMap, search, tagFilter])
+  }, [cleanupPhones, consentFilter, contacts, groupFilter, groupMap, search, tagFilter])
 
   const unassignedCount = contacts.filter((contact) => !contact.group_id).length
   const consentedCount = contacts.filter((contact) => contact.consent_status === "opted_in").length
@@ -184,6 +209,10 @@ export default function ContactsPage() {
   const currentContactCount = planUsage?.current_contacts ?? contacts.length
   const remainingContactLimit = contactLimit === null ? undefined : Math.max(0, contactLimit - currentContactCount)
   const contactLimitReached = typeof remainingContactLimit === "number" && remainingContactLimit <= 0
+  const cleanupMatchedCount = cleanupPhones.length > 0
+    ? contacts.filter((contact) => cleanupPhones.includes(normalizePhoneForCompare(contact.phone))).length
+    : 0
+  const cleanupMissingCount = cleanupPhones.length > 0 ? Math.max(0, cleanupPhones.length - cleanupMatchedCount) : 0
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 
   const paged = useMemo(() => {
@@ -193,7 +222,15 @@ export default function ContactsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, groupFilter, tagFilter, consentFilter])
+  }, [cleanupPhones, search, groupFilter, tagFilter, consentFilter])
+
+  const clearCleanupFilter = () => {
+    setCleanupPhones([])
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("msgnex_failed_cleanup_phones")
+      window.history.replaceState(null, "", "/contacts")
+    }
+  }
 
   const handleDelete = async (id: string) => {
     const supabase = createClient()
@@ -373,6 +410,21 @@ export default function ContactsPage() {
       {contactLimitReached && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Mevcut plan kişi limitine ulaştı. Daha fazla kişi eklemek için Planım ekranından yükseltme talebi gönderebilirsiniz.
+        </div>
+      )}
+
+      {cleanupPhones.length > 0 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-semibold">Kampanya başarısız alıcı temizliği açık</p>
+              <p className="mt-1">
+                {cleanupPhones.length} başarısız numara içinden {cleanupMatchedCount} kişi kaydı eşleşti.
+                {cleanupMissingCount > 0 ? ` ${cleanupMissingCount} numara kişi listesinde bulunamadı.` : ""}
+              </p>
+            </div>
+            <Button variant="secondary" onClick={clearCleanupFilter}>Temizlik Filtresini Kapat</Button>
+          </div>
         </div>
       )}
 
@@ -593,9 +645,9 @@ export default function ContactsPage() {
         ) : (
           <EmptyState
             icon={<span className="text-2xl">Kİ</span>}
-            title={search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" ? "Filtreye uygun kişi bulunamadı" : "Kişi bulunamadı"}
+            title={search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" || cleanupPhones.length > 0 ? "Filtreye uygun kişi bulunamadı" : "Kişi bulunamadı"}
             description="Kişi ekleyerek veya CSV yükleyerek CRM listenizi oluşturmaya başlayın."
-            action={<Button variant="secondary" onClick={search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" ? () => { setSearch(""); setGroupFilter("all"); setTagFilter("all"); setConsentFilter("all") } : () => setUploadMode("single")}>{search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" ? "Filtreleri Temizle" : "Kişi Ekle"}</Button>}
+            action={<Button variant="secondary" onClick={search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" || cleanupPhones.length > 0 ? () => { setSearch(""); setGroupFilter("all"); setTagFilter("all"); setConsentFilter("all"); clearCleanupFilter() } : () => setUploadMode("single")}>{search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" || cleanupPhones.length > 0 ? "Filtreleri Temizle" : "Kişi Ekle"}</Button>}
           />
         )}
       </Card>

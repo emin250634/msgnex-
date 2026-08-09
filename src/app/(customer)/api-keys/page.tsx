@@ -14,7 +14,13 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { PLAN_LABELS, type CompanyPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/client"
-import type { CustomerApiKey } from "@/types"
+import type { ApiKeyUsage, CustomerApiKey } from "@/types"
+
+const API_LIMITS: Record<CompanyPlan, { perMinute: number; dailyGuidance: number; label: string }> = {
+  starter: { perMinute: 0, dailyGuidance: 0, label: "API kapalı" },
+  professional: { perMinute: 60, dailyGuidance: 10000, label: "Standart API kullanımı" },
+  agency: { perMinute: 300, dailyGuidance: 100000, label: "Yüksek hacimli API kullanımı" },
+}
 
 function generateApiKey(): string {
   const bytes = new Uint8Array(32)
@@ -31,6 +37,7 @@ async function sha256(value: string): Promise<string> {
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState<CustomerApiKey[]>([])
+  const [usage, setUsage] = useState<Record<string, ApiKeyUsage>>({})
   const [plan, setPlan] = useState<{ plan: CompanyPlan; has_api_access: boolean } | null>(null)
   const [name, setName] = useState("")
   const [createdKey, setCreatedKey] = useState("")
@@ -42,15 +49,20 @@ export default function ApiKeysPage() {
     setLoading(true)
     setError("")
     const supabase = createClient()
-    const [{ data, error: loadError }, { data: planRows }] = await Promise.all([
+    const [{ data, error: loadError }, { data: usageRows, error: usageError }, { data: planRows }] = await Promise.all([
       supabase.rpc("list_customer_api_keys"),
+      supabase.rpc("list_customer_api_key_usage"),
       supabase.rpc("get_customer_plan"),
     ])
     if (loadError) {
       setError(loadError.message)
       toast.error(loadError.message)
     }
+    if (usageError && !String(usageError.message).includes("does not exist")) {
+      toast.error(usageError.message)
+    }
     setKeys(data ?? [])
+    setUsage(Object.fromEntries(((usageRows ?? []) as ApiKeyUsage[]).map((row) => [row.key_id, row])))
     setPlan(planRows?.[0] ?? null)
     setLoading(false)
   }
@@ -100,6 +112,8 @@ export default function ApiKeysPage() {
     toast.success("API anahtarı panoya kopyalandı")
   }
 
+  const currentLimits = API_LIMITS[plan?.plan ?? "starter"]
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -124,6 +138,17 @@ export default function ApiKeysPage() {
         title="API Anahtarları"
         description={`Kendi yazılımınızdan işlemsel SMS göndermek için güvenli API anahtarları oluşturun. Mevcut plan: ${plan ? PLAN_LABELS[plan.plan] : "-"}`}
       />
+
+      <Card title="API Kullanım Limitleri">
+        <div className="grid gap-3 md:grid-cols-3">
+          <LimitBox title="Plan Durumu" value={currentLimits.label} />
+          <LimitBox title="Dakikalık Limit" value={currentLimits.perMinute > 0 ? `${currentLimits.perMinute} istek/dk` : "Kapalı"} />
+          <LimitBox title="Günlük Limit" value={currentLimits.dailyGuidance > 0 ? `${currentLimits.dailyGuidance.toLocaleString("tr-TR")} istek` : "Kapalı"} />
+        </div>
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+          API gönderimlerinde plan bazlı oran sınırlama uygulanır. Limit aşımında dış API `429` ve `Retry-After` header bilgisini döndürür; entegrasyonlarınızda idempotency ve retry mantığını buna göre planlayın.
+        </div>
+      </Card>
 
       {createdKey && (
         <Card title="Yeni API Anahtarınız">
@@ -156,17 +181,30 @@ export default function ApiKeysPage() {
       <Card title="Mevcut Anahtarlar">
         {keys.length > 0 ? (
           <Table>
-            <THead><Tr><Th>Ad</Th><Th>Anahtar Başlangıcı</Th><Th>Son Kullanım</Th><Th>Durum</Th><Th></Th></Tr></THead>
+            <THead><Tr><Th>Ad</Th><Th>Anahtar Başlangıcı</Th><Th>Kullanım</Th><Th>Son 24 Saat</Th><Th>Son Kullanım</Th><Th>Durum</Th><Th></Th></Tr></THead>
             <TBody>
-              {keys.map((key) => (
-                <Tr key={key.id}>
-                  <Td className="font-medium">{key.name}</Td>
-                  <Td className="font-mono text-sm">{key.key_prefix}...</Td>
-                  <Td className="text-sm text-gray-500">{key.last_used_at ? new Date(key.last_used_at).toLocaleString("tr-TR") : "-"}</Td>
-                  <Td><StatusBadge label={key.is_active ? "Aktif" : "İptal"} tone={key.is_active ? "success" : "neutral"} /></Td>
-                  <Td>{key.is_active && <Button variant="danger" size="sm" onClick={() => handleRevoke(key.id)}>İptal Et</Button>}</Td>
-                </Tr>
-              ))}
+              {keys.map((key) => {
+                const keyUsage = usage[key.id]
+                const failed = keyUsage?.failed_messages ?? 0
+                const success = keyUsage?.successful_messages ?? 0
+                return (
+                  <Tr key={key.id}>
+                    <Td className="font-medium">{key.name}</Td>
+                    <Td className="font-mono text-sm">{key.key_prefix}...</Td>
+                    <Td>
+                      <div className="text-sm font-semibold text-gray-950">{keyUsage?.total_requests ?? 0} istek</div>
+                      <div className="text-xs text-gray-500">{success} başarılı / {failed} hatalı SMS</div>
+                    </Td>
+                    <Td>
+                      <StatusBadge label={`${keyUsage?.requests_last_24h ?? 0} istek`} tone={(keyUsage?.requests_last_24h ?? 0) > currentLimits.dailyGuidance * 0.8 && currentLimits.dailyGuidance > 0 ? "warning" : "info"} />
+                      {(keyUsage?.processing_requests ?? 0) > 0 && <div className="mt-1 text-xs text-amber-700">{keyUsage?.processing_requests} işleniyor</div>}
+                    </Td>
+                    <Td className="text-sm text-gray-500">{keyUsage?.last_request_at ? new Date(keyUsage.last_request_at).toLocaleString("tr-TR") : key.last_used_at ? new Date(key.last_used_at).toLocaleString("tr-TR") : "-"}</Td>
+                    <Td><StatusBadge label={key.is_active ? "Aktif" : "İptal"} tone={key.is_active ? "success" : "neutral"} /></Td>
+                    <Td>{key.is_active && <Button variant="danger" size="sm" onClick={() => handleRevoke(key.id)}>İptal Et</Button>}</Td>
+                  </Tr>
+                )
+              })}
             </TBody>
           </Table>
         ) : (
@@ -179,135 +217,23 @@ export default function ApiKeysPage() {
         )}
       </Card>
 
-      <Card title="Örnek API İsteği">
-        <div className="space-y-5">
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-            API gönderimleri firmanızın bağlı Netgsm provider hesabı ve onaylı gönderici başlığı üzerinden yapılır.
-            MSGNEX SMS kredisi satmaz; sağlayıcıdaki kredi firmanızın kendi hesabından kullanılır.
+      <Card title="Geliştirici Rehberi">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-sm leading-6 text-gray-700">
+            Endpoint, header, idempotency, request/response örnekleri ve hata durumları ayrı rehber sayfasında tutulur.
           </div>
-
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <ApiDocItem label="Endpoint" value="POST /api/v1/external/messages" />
-            <ApiDocItem label="Kimlik Doğrulama" value="Authorization: Bearer API_ANAHTARINIZ" />
-            <ApiDocItem label="Idempotency" value="Idempotency-Key zorunludur" />
-            <ApiDocItem label="Limit" value="Tek istekte en fazla 1000 alıcı" />
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-semibold text-gray-950">Entegrasyon Öncesi Kontrol</p>
-            <div className="grid gap-2 text-sm md:grid-cols-2">
-              <ApiChecklistItem text="Provider bağlantısı aktif olmalı." />
-              <ApiChecklistItem text="Onaylı gönderici başlığı tanımlı olmalı." />
-              <ApiChecklistItem text="Sağlayıcı hesabında yeterli kredi bulunmalı." />
-              <ApiChecklistItem text="Her API isteğinde benzersiz Idempotency-Key gönderilmeli." />
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-semibold text-gray-950">cURL Örneği</p>
-            <pre className="overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-gray-100">
-{`curl -X POST https://app.msgnex.com/api/v1/external/messages \\
-  -H "Authorization: Bearer API_ANAHTARINIZ" \\
-  -H "Idempotency-Key: crm-order-12345" \\
-  -H "Content-Type: application/json" \\
-  -d '{"recipients":["905551112233"],"message":"Siparişiniz hazır."}'`}
-            </pre>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div>
-              <p className="mb-2 text-sm font-semibold text-gray-950">Request Body</p>
-              <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
-{`{
-  "recipients": ["905551112233", "05554443322"],
-  "message": "Siparişiniz hazır."
-}`}
-              </pre>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-semibold text-gray-950">JavaScript fetch</p>
-              <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
-{`await fetch("/api/v1/external/messages", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer API_ANAHTARINIZ",
-    "Idempotency-Key": "crm-order-12345",
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    recipients: ["905551112233"],
-    message: "Siparişiniz hazır."
-  })
-})`}
-              </pre>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-semibold text-gray-950">Başarılı Cevap</p>
-              <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
-{`{
-  "campaignId": "uuid",
-  "success": 2,
-  "fail": 0,
-  "pending": 2,
-  "provider": "netgsm",
-  "providerBulkId": "123456"
-}`}
-              </pre>
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-semibold text-gray-950">PHP cURL</p>
-            <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
-{`$payload = json_encode([
-  "recipients" => ["905551112233"],
-  "message" => "Siparişiniz hazır."
-]);
-
-$ch = curl_init("https://app.msgnex.com/api/v1/external/messages");
-curl_setopt_array($ch, [
-  CURLOPT_POST => true,
-  CURLOPT_HTTPHEADER => [
-    "Authorization: Bearer API_ANAHTARINIZ",
-    "Idempotency-Key: crm-order-12345",
-    "Content-Type: application/json"
-  ],
-  CURLOPT_POSTFIELDS => $payload,
-  CURLOPT_RETURNTRANSFER => true
-]);
-
-$response = curl_exec($ch);`}
-            </pre>
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-semibold text-gray-950">Hata Durumları</p>
-            <div className="grid gap-2 text-sm md:grid-cols-2">
-              <ApiDocItem label="401" value="Authorization veya Idempotency-Key eksik" />
-              <ApiDocItem label="400" value="Alıcı, mesaj veya provider hazırlığı geçersiz" />
-              <ApiDocItem label="409" value="Aynı idempotency key ile istek işleniyor" />
-              <ApiDocItem label="500" value="API veya provider sonucu kaydedilemedi" />
-            </div>
-          </div>
+          <Link href="/api-guide"><Button variant="secondary">API Rehberini Aç</Button></Link>
         </div>
       </Card>
     </div>
   )
 }
 
-function ApiDocItem({ label, value }: { label: string; value: string }) {
+function LimitBox({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
-      <p className="mt-1 font-mono text-sm text-gray-950">{value}</p>
-    </div>
-  )
-}
-
-function ApiChecklistItem({ text }: { text: string }) {
-  return (
-    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
-      <span className="font-semibold">✓</span> {text}
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <p className="text-xs font-semibold uppercase text-gray-500">{title}</p>
+      <p className="mt-2 text-lg font-semibold text-gray-950">{value}</p>
     </div>
   )
 }

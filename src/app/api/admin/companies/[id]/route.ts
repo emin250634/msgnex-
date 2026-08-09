@@ -3,6 +3,8 @@ import { requireAdminAuth } from "@/lib/auth/admin"
 import { writeAuditLog } from "@/lib/audit-log"
 import { isCompanyPlan } from "@/lib/plans"
 
+const SALES_STATUSES = ["new", "contacted", "pilot", "won", "lost"]
+
 interface RouteContext {
   params: {
     id: string
@@ -64,15 +66,47 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     const { adminClient, profile, userId } = auth.context
     const body = await request.json().catch(() => ({}))
-    const plan = String(body.plan ?? "").trim()
+    const updates: Record<string, string | null> = {}
+    const metadata: Record<string, unknown> = {}
 
-    if (!isCompanyPlan(plan)) {
-      return NextResponse.json({ error: "Firma planı geçersiz" }, { status: 400 })
+    if ("plan" in body) {
+      const plan = String(body.plan ?? "").trim()
+      if (!isCompanyPlan(plan)) {
+        return NextResponse.json({ error: "Firma planı geçersiz" }, { status: 400 })
+      }
+      updates.plan = plan
+    }
+
+    if ("sales_status" in body) {
+      const salesStatus = String(body.sales_status ?? "").trim()
+      if (!SALES_STATUSES.includes(salesStatus)) {
+        return NextResponse.json({ error: "Satış durumu geçersiz" }, { status: 400 })
+      }
+      updates.sales_status = salesStatus
+    }
+
+    if ("pilot_started_at" in body) {
+      const pilotStartedAt = String(body.pilot_started_at ?? "").trim()
+      updates.pilot_started_at = pilotStartedAt || null
+    }
+
+    if ("expected_monthly_sms_volume" in body) {
+      const expectedVolume = String(body.expected_monthly_sms_volume ?? "").trim().slice(0, 80)
+      updates.expected_monthly_sms_volume = expectedVolume || null
+    }
+
+    if ("sales_note" in body) {
+      const salesNote = String(body.sales_note ?? "").trim().slice(0, 2000)
+      updates.sales_note = salesNote || null
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "Güncellenecek alan bulunamadı" }, { status: 400 })
     }
 
     const { data: currentCompany, error: currentError } = await adminClient
       .from("companies")
-      .select("id, plan")
+      .select("id, plan, sales_status, pilot_started_at, expected_monthly_sms_volume, sales_note")
       .eq("id", params.id)
       .maybeSingle()
 
@@ -81,7 +115,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     const { data: company, error: updateError } = await adminClient
       .from("companies")
-      .update({ plan })
+      .update(updates)
       .eq("id", params.id)
       .select("*")
       .maybeSingle()
@@ -89,21 +123,26 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
     if (!company) return NextResponse.json({ error: "Firma bulunamadi" }, { status: 404 })
 
+    const currentValues = currentCompany as Record<string, unknown>
+    for (const [key, value] of Object.entries(updates)) {
+      metadata[key] = {
+        previous: currentValues[key] ?? null,
+        next: value,
+      }
+    }
+
     await writeAuditLog({
       adminClient,
       actorUserId: userId,
       actorRole: profile.role,
-      action: "company.plan.update",
+      action: "company.update",
       targetType: "company",
       targetId: params.id,
       companyId: params.id,
-      metadata: {
-        previous_plan: currentCompany.plan ?? "starter",
-        next_plan: plan,
-      },
+      metadata,
     })
 
-    return NextResponse.json({ company, message: "Firma planı güncellendi" })
+    return NextResponse.json({ company, message: "Firma güncellendi" })
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unexpected server error" },

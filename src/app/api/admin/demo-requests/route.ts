@@ -45,6 +45,9 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
         is_active: true,
         sender_name: "",
         sender_approved: false,
+        sales_status: "pilot",
+        expected_monthly_sms_volume: String(demo.monthly_sms_volume || "").trim() || null,
+        sales_note: String(demo.message || "").trim() || null,
       }).select("id").single()
       if (companyError || !company) throw new Error(companyError?.message || "Firma oluşturulamadı.")
       companyId = company.id

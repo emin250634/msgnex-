@@ -1,17 +1,43 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Card } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
 import { Table, THead, TBody, Th, Td, Tr } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+
+function csvValue(value: unknown) {
+  if (value === null || value === undefined) return ""
+  const text = typeof value === "string" ? value : JSON.stringify(value)
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
 
 export default function LogsPage() {
   const [messages, setMessages] = useState<any[]>([])
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [auditSearch, setAuditSearch] = useState("")
+  const [actionFilter, setActionFilter] = useState("all")
+  const [companyFilter, setCompanyFilter] = useState("all")
+  const [actorRoleFilter, setActorRoleFilter] = useState("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+  const [apiOnly, setApiOnly] = useState(false)
 
   const load = async () => {
     const supabase = createClient()
@@ -87,9 +113,24 @@ export default function LogsPage() {
     )
   })
 
+  const actionOptions = Array.from(new Set(auditLogs.map((log) => log.action).filter(Boolean))).sort()
+  const companyOptions = Array.from(
+    new Map(
+      auditLogs
+        .filter((log) => log.company_id)
+        .map((log) => [log.company_id, log.company_name || log.company_id])
+    ).entries()
+  ).sort((a, b) => String(a[1]).localeCompare(String(b[1]), "tr"))
+
   const filteredAuditLogs = auditLogs.filter((log) => {
-    if (!search.trim()) return true
-    const q = search.toLowerCase()
+    if (apiOnly && !String(log.action ?? "").startsWith("api")) return false
+    if (actionFilter !== "all" && log.action !== actionFilter) return false
+    if (companyFilter !== "all" && log.company_id !== companyFilter) return false
+    if (actorRoleFilter !== "all" && log.actor_role !== actorRoleFilter) return false
+    if (dateFrom && new Date(log.created_at) < new Date(`${dateFrom}T00:00:00`)) return false
+    if (dateTo && new Date(log.created_at) > new Date(`${dateTo}T23:59:59`)) return false
+    if (!auditSearch.trim()) return true
+    const q = auditSearch.toLowerCase()
     return (
       log.actor_name?.toLowerCase().includes(q) ||
       log.company_name?.toLowerCase().includes(q) ||
@@ -98,6 +139,35 @@ export default function LogsPage() {
       JSON.stringify(log.metadata ?? {}).toLowerCase().includes(q)
     )
   })
+
+  const clearAuditFilters = () => {
+    setAuditSearch("")
+    setActionFilter("all")
+    setCompanyFilter("all")
+    setActorRoleFilter("all")
+    setDateFrom("")
+    setDateTo("")
+    setApiOnly(false)
+  }
+
+  const exportAuditCsv = () => {
+    const rows = [
+      ["Tarih", "Aktor", "Aktor Tipi", "Aksiyon", "Hedef Tipi", "Hedef ID", "Firma", "Detay"],
+      ...filteredAuditLogs.map((log) => [
+        new Date(log.created_at).toLocaleString("tr-TR"),
+        log.actor_name,
+        log.actor_role,
+        log.action,
+        log.target_type,
+        log.target_id,
+        log.company_name,
+        log.metadata ?? {},
+      ]),
+    ]
+    const csv = rows.map((row) => row.map(csvValue).join(",")).join("\n")
+    const today = new Date().toISOString().slice(0, 10)
+    downloadTextFile(`msgnex-audit-log-${today}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8")
+  }
 
   if (loading) return <p>Yükleniyor...</p>
 
@@ -166,11 +236,72 @@ export default function LogsPage() {
       </Card>
 
       <Card title="Operasyon Audit Logları">
+        <div className="mb-4 grid gap-3 lg:grid-cols-6">
+          <div className="lg:col-span-2">
+            <Input
+              placeholder="Aktör, firma, aksiyon veya detay ara..."
+              value={auditSearch}
+              onChange={(e) => setAuditSearch(e.target.value)}
+            />
+          </div>
+          <FilterSelect label="Aksiyon" value={actionFilter} onChange={setActionFilter}>
+            <option value="all">Tüm aksiyonlar</option>
+            {actionOptions.map((action) => (
+              <option key={action} value={action}>{action}</option>
+            ))}
+          </FilterSelect>
+          <FilterSelect label="Firma" value={companyFilter} onChange={setCompanyFilter}>
+            <option value="all">Tüm firmalar</option>
+            {companyOptions.map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+          </FilterSelect>
+          <FilterSelect label="Aktör" value={actorRoleFilter} onChange={setActorRoleFilter}>
+            <option value="all">Tüm aktörler</option>
+            <option value="admin">Admin</option>
+            <option value="customer">Müşteri</option>
+            <option value="api">API</option>
+          </FilterSelect>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Başlangıç</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-gray-900"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Bitiş</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+              className="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-gray-900"
+            />
+          </label>
+        </div>
+        <div className="mb-4 flex flex-col gap-3 border-b border-gray-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={apiOnly}
+              onChange={(event) => setApiOnly(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Sadece API olayları
+          </label>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{filteredAuditLogs.length} kayıt gösteriliyor</span>
+            <Button variant="secondary" size="sm" onClick={exportAuditCsv} disabled={filteredAuditLogs.length === 0}>CSV İndir</Button>
+            <Button variant="secondary" size="sm" onClick={clearAuditFilters}>Filtreleri Temizle</Button>
+          </div>
+        </div>
         <Table>
           <THead>
             <Tr>
               <Th>Tarih</Th>
-              <Th>Admin</Th>
+              <Th>Aktör</Th>
               <Th>Aksiyon</Th>
               <Th>Hedef</Th>
               <Th>Firma</Th>
@@ -181,7 +312,10 @@ export default function LogsPage() {
             {filteredAuditLogs.map((log) => (
               <Tr key={log.id}>
                 <Td className="text-sm text-gray-500">{new Date(log.created_at).toLocaleString("tr-TR")}</Td>
-                <Td className="font-medium">{log.actor_name}</Td>
+                <Td className="font-medium">
+                  {log.actor_name}
+                  {log.actor_role ? <span className="block text-xs font-normal text-gray-400">{log.actor_role}</span> : null}
+                </Td>
                 <Td>
                   <span className="rounded bg-blue-50 px-2 py-1 font-mono text-xs text-blue-700">
                     {log.action}
@@ -204,8 +338,33 @@ export default function LogsPage() {
             )}
           </TBody>
         </Table>
-        <p className="mt-2 text-xs text-gray-400">Son 100 operasyon kaydı gösteriliyor</p>
+        <p className="mt-2 text-xs text-gray-400">Son 100 operasyon kaydı içinde filtreleme yapılır</p>
       </Card>
     </div>
+  )
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  children: ReactNode
+}) {
+  return (
+    <label className="block text-sm">
+      <span className="mb-1 block font-medium text-gray-700">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-gray-900"
+      >
+        {children}
+      </select>
+    </label>
   )
 }

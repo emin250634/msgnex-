@@ -57,6 +57,13 @@ interface ProviderFormState {
   isTestMode: boolean
 }
 
+interface SalesPilotFormState {
+  salesStatus: "new" | "contacted" | "pilot" | "won" | "lost"
+  pilotStartedAt: string
+  expectedMonthlySmsVolume: string
+  salesNote: string
+}
+
 interface CompanyUserRow {
   id: string
   user_id: string
@@ -87,6 +94,23 @@ interface CompanyWebhookDeliveryRow {
   response_status: number | null
   error: string | null
   created_at: string
+}
+
+interface CompanyOnboardingSummary {
+  company_id: string
+  provider_ready: boolean
+  sender_header_ready: boolean
+  contact_count: number
+  group_count: number
+  template_count: number
+  campaign_count: number
+  active_api_key_count: number
+  active_webhook_count: number
+  completed_required_steps: number
+  total_required_steps: number
+  progress: number
+  status: "pilot_ready" | "provider_blocked" | "data_needed" | "test_campaign_needed" | "in_progress"
+  next_step: string
 }
 
 function formatDate(value?: string | null) {
@@ -125,11 +149,48 @@ function syncStatusLabel(status?: string | null) {
   return labels[status || "unknown"] || status || "Bilinmiyor"
 }
 
+function salesStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    new: "Yeni",
+    contacted: "Görüşüldü",
+    pilot: "Pilot",
+    won: "Kazanıldı",
+    lost: "Kaybedildi",
+  }
+  return labels[status || "new"] || status || "Yeni"
+}
+
+function salesStatusTone(status?: string | null) {
+  if (status === "won") return "success" as const
+  if (status === "lost") return "danger" as const
+  if (status === "pilot") return "info" as const
+  if (status === "contacted") return "warning" as const
+  return "neutral" as const
+}
+
 function statusTone(status?: string | null) {
   if (status === "connected" || status === "approved" || status === "synced") return "success" as const
   if (status === "error" || status === "rejected") return "danger" as const
   if (status === "disabled") return "neutral" as const
   return "warning" as const
+}
+
+function onboardingLabel(status: CompanyOnboardingSummary["status"]) {
+  const labels = {
+    pilot_ready: "Pilot Hazır",
+    provider_blocked: "Provider Eksik",
+    data_needed: "Veri Bekliyor",
+    test_campaign_needed: "Test Bekliyor",
+    in_progress: "Kurulum Sürüyor",
+  }
+  return labels[status] || status
+}
+
+function onboardingTone(status: CompanyOnboardingSummary["status"]) {
+  if (status === "pilot_ready") return "success" as const
+  if (status === "provider_blocked") return "danger" as const
+  if (status === "data_needed" || status === "test_campaign_needed") return "warning" as const
+  return "info" as const
 }
 
 function formFromSettings(data: ProviderSettingsResponse): ProviderFormState {
@@ -152,6 +213,7 @@ export default function AdminCompanyDetailPage() {
   const [companyUsers, setCompanyUsers] = useState<CompanyUserRow[]>([])
   const [companyWebhooks, setCompanyWebhooks] = useState<CompanyWebhookRow[]>([])
   const [webhookDeliveries, setWebhookDeliveries] = useState<CompanyWebhookDeliveryRow[]>([])
+  const [onboardingSummary, setOnboardingSummary] = useState<CompanyOnboardingSummary | null>(null)
   const [form, setForm] = useState<ProviderFormState>({
     usercode: "",
     secret: "",
@@ -161,9 +223,16 @@ export default function AdminCompanyDetailPage() {
     isActive: false,
     isTestMode: false,
   })
+  const [salesForm, setSalesForm] = useState<SalesPilotFormState>({
+    salesStatus: "new",
+    pilotStartedAt: "",
+    expectedMonthlySmsVolume: "",
+    salesNote: "",
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingPlan, setSavingPlan] = useState(false)
+  const [savingSales, setSavingSales] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [providerAction, setProviderAction] = useState<"test_connection" | "query_headers" | "query_credit" | null>(null)
@@ -179,7 +248,7 @@ export default function AdminCompanyDetailPage() {
     setError("")
 
     const supabase = createClient()
-    const [{ data: companyData }, providerResponse, usersResponse, { data: webhookRows }, { data: deliveryRows }] = await Promise.all([
+    const [{ data: companyData }, providerResponse, usersResponse, { data: webhookRows }, { data: deliveryRows }, { data: onboardingRows }] = await Promise.all([
       supabase.from("companies").select("*").eq("id", params.id).maybeSingle(),
       fetch(`/api/admin/companies/${params.id}/provider-settings`),
       fetch(`/api/admin/companies/${params.id}/users`),
@@ -194,6 +263,7 @@ export default function AdminCompanyDetailPage() {
         .eq("company_id", params.id)
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase.rpc("list_admin_company_onboarding", { p_company_id: params.id }),
     ])
 
     if (!companyData) {
@@ -202,6 +272,12 @@ export default function AdminCompanyDetailPage() {
       return
     }
     setCompany(companyData)
+    setSalesForm({
+      salesStatus: companyData.sales_status || "new",
+      pilotStartedAt: companyData.pilot_started_at || "",
+      expectedMonthlySmsVolume: companyData.expected_monthly_sms_volume || "",
+      salesNote: companyData.sales_note || "",
+    })
 
     if (!providerResponse.ok) {
       const payload = await providerResponse.json().catch(() => ({ error: "Provider ayarları yüklenemedi" }))
@@ -219,6 +295,7 @@ export default function AdminCompanyDetailPage() {
     }
     setCompanyWebhooks((webhookRows ?? []) as CompanyWebhookRow[])
     setWebhookDeliveries((deliveryRows ?? []) as CompanyWebhookDeliveryRow[])
+    setOnboardingSummary(((onboardingRows ?? []) as CompanyOnboardingSummary[])[0] ?? null)
     setLoading(false)
   }
 
@@ -303,6 +380,30 @@ export default function AdminCompanyDetailPage() {
 
     setCompany(payload.company)
     toast.success(payload.message || "Firma planı güncellendi")
+  }
+
+  const handleSalesSave = async () => {
+    setSavingSales(true)
+    const response = await fetch(`/api/admin/companies/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sales_status: salesForm.salesStatus,
+        pilot_started_at: salesForm.pilotStartedAt || null,
+        expected_monthly_sms_volume: salesForm.expectedMonthlySmsVolume || null,
+        sales_note: salesForm.salesNote || null,
+      }),
+    })
+    const payload = await response.json().catch(() => ({ error: "Satış bilgileri güncellenemedi" }))
+    setSavingSales(false)
+
+    if (!response.ok) {
+      toast.error(payload.error || "Satış bilgileri güncellenemedi")
+      return
+    }
+
+    setCompany(payload.company)
+    toast.success(payload.message || "Satış bilgileri güncellendi")
   }
 
   const runProviderAction = async (action: "test_connection" | "query_headers" | "query_credit") => {
@@ -444,6 +545,104 @@ export default function AdminCompanyDetailPage() {
         <StatCard title="Bağlantı" value={connectionLabel(settings?.connection_status)} description="Test bağlantısı bu fazda yok" tone={settings?.connection_status === "connected" ? "emerald" : "amber"} icon={<span className="font-semibold">API</span>} />
         <StatCard title="Netgsm Kredi Durumu" value={wallet ? wallet.balance.toLocaleString("tr-TR") : "-"} description={wallet ? `${wallet.balance_unit || "sms"} / ${wallet.currency || "TRY"}` : "Henüz sorgulanmadı"} tone="slate" icon={<span className="font-semibold">₺</span>} />
       </div>
+
+      {onboardingSummary && (
+        <Card title="Pilot Onboarding Durumu">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem] xl:items-center">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge label={onboardingLabel(onboardingSummary.status)} tone={onboardingTone(onboardingSummary.status)} />
+                <span className="text-sm text-gray-500">
+                  {onboardingSummary.completed_required_steps} / {onboardingSummary.total_required_steps} zorunlu adım
+                </span>
+              </div>
+              <p className="mt-3 text-2xl font-semibold text-gray-950">%{onboardingSummary.progress} tamamlandı</p>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-gray-100">
+                <div className="h-full rounded-full bg-blue-600" style={{ width: `${onboardingSummary.progress}%` }} />
+              </div>
+              <p className="mt-3 text-sm leading-6 text-gray-600">
+                Sıradaki aksiyon: <span className="font-semibold text-gray-950">{onboardingSummary.next_step}</span>
+              </p>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+              <p className="text-sm font-semibold text-gray-950">Pilot takip özeti</p>
+              <div className="mt-3 space-y-2 text-sm text-gray-600">
+                <InfoRow label="Kişi" value={onboardingSummary.contact_count.toLocaleString("tr-TR")} />
+                <InfoRow label="Segment" value={onboardingSummary.group_count.toLocaleString("tr-TR")} />
+                <InfoRow label="Kampanya" value={onboardingSummary.campaign_count.toLocaleString("tr-TR")} />
+                <InfoRow label="API Key" value={onboardingSummary.active_api_key_count.toLocaleString("tr-TR")} />
+                <InfoRow label="Webhook" value={onboardingSummary.active_webhook_count.toLocaleString("tr-TR")} />
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-5">
+            <OnboardingCheck label="Provider" done={onboardingSummary.provider_ready} />
+            <OnboardingCheck label="Başlık" done={onboardingSummary.sender_header_ready} />
+            <OnboardingCheck label="Kişi" done={onboardingSummary.contact_count > 0} />
+            <OnboardingCheck label="Segment" done={onboardingSummary.group_count > 0} />
+            <OnboardingCheck label="Test Kampanya" done={onboardingSummary.campaign_count > 0} />
+          </div>
+        </Card>
+      )}
+
+      <Card title="Satış & Pilot Notları">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Satış durumu</label>
+              <select
+                value={salesForm.salesStatus}
+                onChange={(event) => setSalesForm((state) => ({ ...state, salesStatus: event.target.value as SalesPilotFormState["salesStatus"] }))}
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="new">Yeni</option>
+                <option value="contacted">Görüşüldü</option>
+                <option value="pilot">Pilot</option>
+                <option value="won">Kazanıldı</option>
+                <option value="lost">Kaybedildi</option>
+              </select>
+            </div>
+            <Input
+              label="Pilot başlangıç tarihi"
+              type="date"
+              value={salesForm.pilotStartedAt}
+              onChange={(event) => setSalesForm((state) => ({ ...state, pilotStartedAt: event.target.value }))}
+            />
+            <Input
+              label="Beklenen aylık SMS hacmi"
+              placeholder="Örn: 5.000 - 10.000"
+              value={salesForm.expectedMonthlySmsVolume}
+              onChange={(event) => setSalesForm((state) => ({ ...state, expectedMonthlySmsVolume: event.target.value }))}
+            />
+            <div className="md:col-span-3">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Admin satış/pilot notu</label>
+              <textarea
+                rows={5}
+                maxLength={2000}
+                value={salesForm.salesNote}
+                onChange={(event) => setSalesForm((state) => ({ ...state, salesNote: event.target.value }))}
+                placeholder="Görüşme notu, karar verici, pilot hedefi, takip tarihi veya fiyat beklentisi"
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">{salesForm.salesNote.length}/2000 karakter</p>
+            </div>
+          </div>
+          <aside className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <p className="text-sm font-semibold text-gray-950">Satış Özeti</p>
+            <div className="mt-3 space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-500">Durum</span>
+                <StatusBadge label={salesStatusLabel(salesForm.salesStatus)} tone={salesStatusTone(salesForm.salesStatus)} />
+              </div>
+              <InfoRow label="Pilot başlangıcı" value={salesForm.pilotStartedAt || "-"} />
+              <InfoRow label="Aylık hacim" value={salesForm.expectedMonthlySmsVolume || "-"} />
+            </div>
+            <Button className="mt-5 w-full" onClick={handleSalesSave} disabled={savingSales}>
+              {savingSales ? "Kaydediliyor..." : "Satış Bilgilerini Kaydet"}
+            </Button>
+          </aside>
+        </div>
+      </Card>
 
       <Card title="Firma Planı">
         <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
@@ -942,6 +1141,15 @@ function LimitBox({ title, value }: { title: string; value: string }) {
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-900">
       <p className="text-xs font-semibold uppercase text-slate-500">{title}</p>
       <p className="mt-2 font-semibold">{value}</p>
+    </div>
+  )
+}
+
+function OnboardingCheck({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className={done ? "rounded-lg border border-emerald-200 bg-emerald-50 p-4" : "rounded-lg border border-amber-200 bg-amber-50 p-4"}>
+      <p className={done ? "text-sm font-semibold text-emerald-950" : "text-sm font-semibold text-amber-950"}>{label}</p>
+      <p className={done ? "mt-2 text-xs text-emerald-700" : "mt-2 text-xs text-amber-700"}>{done ? "Tamam" : "Bekliyor"}</p>
     </div>
   )
 }

@@ -94,7 +94,21 @@ export async function POST(request: Request) {
   })
 
   if (dispatchError || !dispatch) {
+    if (dispatchError?.message?.includes("API rate limit exceeded")) {
+      return NextResponse.json(
+        { error: dispatchError.message, retryAfterSeconds: dispatchError.message.includes("daily") ? 3600 : 60 },
+        { status: 429, headers: { "Retry-After": dispatchError.message.includes("daily") ? "3600" : "60" } }
+      )
+    }
     return NextResponse.json({ error: dispatchError?.message || "Gonderim hazirlanamadi" }, { status: 400 })
+  }
+
+  if (dispatch.rate_limited) {
+    const retryAfterSeconds = dispatch.retry_after_seconds ?? 60
+    return NextResponse.json(
+      { error: dispatch.message || "API rate limit exceeded", retryAfterSeconds },
+      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+    )
   }
 
   if (!dispatch.created) {
