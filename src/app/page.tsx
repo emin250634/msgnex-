@@ -2,14 +2,14 @@ import Link from "next/link"
 import { BrandLogo } from "@/components/ui/brand-logo"
 
 const capabilities = [
-  ["Kendi Provider Hesabınız", "Yetkili SMS sağlayıcınızdan aldığınız hesabı MSGNEX'e bağlayın; SMS kredisi sağlayıcı tarafında kalır.", "provider"],
+  ["Kendi Sağlayıcı Hesabınız", "Yetkili SMS sağlayıcınızdan aldığınız hesabı MSGNEX'e bağlayın; SMS bakiyesi sağlayıcı tarafında kalır.", "provider"],
   ["Onaylı Başlık Güvenliği", "Gönderici başlığı panelden rastgele yazılmaz, sağlayıcıdan gelen onaylı başlık kullanılır.", "shield"],
   ["Kampanya ve CRM Yönetimi", "Kişi, segment, şablon, kara liste ve kampanya süreçlerini tek panelden yönetin.", "campaign"],
-  ["Raporlama ve Denetim", "Provider sonucu, başarısız numara, audit log, API ve webhook olaylarını izleyin.", "chart"],
+  ["Raporlama ve Denetim", "Sağlayıcı sonucu, başarısız numara, audit log, API ve webhook olaylarını izleyin.", "chart"],
 ]
 
 const trustItems = [
-  ["SMS kredisi satışı yok", "Sağlayıcı hesabınız kullanılır"],
+  ["SMS bakiyesi satışı yok", "Sağlayıcı hesabınız kullanılır"],
   ["Onaylı başlık", "Marka taklidi engellenir"],
   ["Kurulum checklist", "Pilot başlangıç netleşir"],
   ["Audit ve uyarılar", "Operasyon izlenebilir"],
@@ -17,22 +17,37 @@ const trustItems = [
 
 const steps = [
   ["01", "Demo Talebi", "Firmanızın iletişim hacmini ve ihtiyaçlarını paylaşın."],
-  ["02", "Provider Hazırlığı", "Yetkili SMS sağlayıcı hesabınız ve onaylı başlığınız doğrulanır."],
+  ["02", "Sağlayıcı Hazırlığı", "Yetkili SMS sağlayıcı hesabınız ve onaylı başlığınız doğrulanır."],
   ["03", "Pilot Kurulum", "Kişi listesi, test segmenti, ilk şablon ve test kampanyası checklist ile tamamlanır."],
   ["04", "Operasyon Takibi", "Kampanya sonuçları, API/webhook olayları, bildirimler ve audit kayıtları izlenir."],
 ]
 
 const differentiators = [
-  ["SMS kredisi satmayız", "MSGNEX'in işi kredi veya başlık satmak değil; firmanızın kendi sağlayıcı hesabını daha düzenli ve ölçülebilir kullanmasını sağlamaktır."],
+  ["SMS bakiyesi satmayız", "MSGNEX'in işi bakiye veya başlık satmak değil; firmanızın kendi sağlayıcı hesabını daha düzenli ve ölçülebilir kullanmasını sağlamaktır."],
   ["Başlık sağlayıcıdan gelir", "Firma panelde farklı marka adı yazamaz. Gönderimler sadece sağlayıcı hesabında tanımlı başlıkla hazırlanır."],
-  ["Pilot süreci takip edilir", "Müşteri kurulum ekranı ve admin onboarding takibiyle provider, kişi listesi ve ilk test kampanyası kontrol altında ilerler."],
+  ["Pilot süreci takip edilir", "Müşteri kurulum ekranı ve admin onboarding takibiyle sağlayıcı, kişi listesi ve ilk test kampanyası kontrol altında ilerler."],
 ]
 
 const operations = [
-  ["Kurulum", "Provider bağlantısı, başlık, kişi listesi ve test kampanyası adımları görünür."],
+  ["Kurulum", "Sağlayıcı bağlantısı, başlık, kişi listesi ve test kampanyası adımları görünür."],
   ["Gönderim", "İzin, kara liste, segment, SMS parçası ve sağlayıcı başlığı gönderim öncesi kontrol edilir."],
-  ["Raporlama", "Başarılı, hatalı, bekleyen ve provider hata kodları kampanya raporunda ayrılır."],
+  ["Raporlama", "Başarılı, hatalı, bekleyen ve sağlayıcı hata kodları kampanya raporunda ayrılır."],
   ["Entegrasyon", "API key, rate limit, webhook secret ve delivery gözlemi kurumsal entegrasyonlara hazırlanır."],
+]
+
+const providerFlow = [
+  ["1", "Sağlayıcı seçimi", "İhtiyaca ve fiyat tekliflerine göre yetkili SMS sağlayıcı alternatifleri değerlendirilir."],
+  ["2", "Firma hesabı", "Hesap, SMS gönderecek firmanın kendi adına açılır ve onaylı başlık sağlayıcı tarafında tanımlanır."],
+  ["3", "MSGNEX bağlantısı", "Uygun sağlayıcı entegrasyonu panelde yapılandırılır; gönderim, raporlama ve denetim MSGNEX üzerinden yönetilir."],
+]
+
+const faqs = [
+  ["MSGNEX SMS bakiyesi satar mı?", "Hayır. SMS bakiyesi ve fiyatlandırma yetkili SMS sağlayıcısı tarafında yönetilir. MSGNEX bu hesabı operasyon paneline bağlar."],
+  ["Hangi SMS sağlayıcısını kullanabilirim?", "Firma ihtiyacına göre farklı yetkili sağlayıcılar değerlendirilebilir. Her sağlayıcının API yapısı farklı olabileceği için entegrasyon durumu ayrıca planlanır."],
+  ["Gönderici başlığını panelden değiştirebilir miyim?", "Hayır. Gönderimler yalnızca sağlayıcı hesabınızda onaylı görünen başlıkla hazırlanır. Bu sayede farklı marka adıyla gönderim riski azaltılır."],
+  ["Müşterilerim bu panelde ne yapar?", "Kişi listelerini, segmentleri, şablonları, kampanyaları, gönderim sonuçlarını, API anahtarlarını, webhook ayarlarını ve bildirimleri yönetir."],
+  ["Canlı SMS göndermeden test yapılabilir mi?", "Evet. Pilot aşamada test modu ve kurulum checklist'iyle akış doğrulanabilir. Canlı gönderim için sağlayıcı hesabı ve onaylı başlık hazır olmalıdır."],
+  ["MSGNEX ne zaman avantaj sağlar?", "SMS süreci Excel, manuel takip ve dağınık raporlardan çıkıp ekiplerin kullanabileceği kontrollü, izlenebilir ve tekrar edilebilir bir operasyona dönüştüğünde."],
 ]
 
 export default function Home() {
@@ -54,19 +69,19 @@ export default function Home() {
               <span className="mt-2 block text-blue-300">iletişim operasyonunuzu yönetin</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              MSGNEX SMS kredisi satmaz. Firmanızın kendi yetkili SMS sağlayıcı hesabını güvenli şekilde bağlar; kişi, kampanya, API, webhook, raporlama ve denetim süreçlerini tek panelde toplar.
+              MSGNEX, SMS satın alma ve gönderim operasyonunu birbirinden ayırır. Firmanızın kendi yetkili SMS sağlayıcı hesabını güvenli şekilde bağlar; kişi, kampanya, API, webhook, raporlama ve denetim süreçlerini tek panelde toplar.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/demo-request" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-7 py-4 text-base font-semibold text-white shadow-xl shadow-blue-950/40 transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-2xl">
                 Demo Talep Et
                 <span className="ml-2" aria-hidden="true">→</span>
               </Link>
-              <a href="#platform" className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-white/5 px-7 py-4 text-base font-semibold text-white backdrop-blur transition-all hover:-translate-y-0.5 hover:bg-white/10">
+              <a href="#nasil-calisir" className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-white/5 px-7 py-4 text-base font-semibold text-white backdrop-blur transition-all hover:-translate-y-0.5 hover:bg-white/10">
                 Platformu İncele
               </a>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-7 gap-y-4 border-t border-white/15 pt-7 text-sm font-medium text-slate-200">
-              {["Kendi sağlayıcı hesabınız", "Onaylı gönderici başlığı", "Audit log ve bildirim merkezi"].map((item) => (
+              {["Kendi sağlayıcı hesabınız", "Onaylı gönderici başlığı", "Bakiye satışı yok", "Audit log ve bildirim merkezi"].map((item) => (
                 <span key={item} className="flex items-center gap-2.5"><span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-400/10 text-xs text-emerald-300">✓</span>{item}</span>
               ))}
             </div>
@@ -103,9 +118,35 @@ export default function Home() {
         </div>
       </section>
 
+      <section id="saglayici" className="border-b border-slate-200 bg-[#fbfcff] py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold text-blue-700">Sağlayıcı bağımsız yaklaşım</p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Müşteri sağlayıcıyı seçer, MSGNEX operasyonu düzenler.</h2>
+            <p className="mt-5 max-w-xl leading-7 text-slate-600">Fiyat, paket, başlık ve yasal süreçler SMS sağlayıcısı tarafında ilerler. MSGNEX tarafında ise bu hesabın ekipler tarafından güvenli, ölçülebilir ve kontrollü kullanılması sağlanır.</p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {["Sağlayıcı teklifleri karşılaştırılabilir", "Hesap firma adına açılır", "Onaylı başlık korunur", "Panel operasyonu standartlaştırır"].map((item) => (
+                <div key={item} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">{item}</div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/70">
+            {providerFlow.map(([number, title, description], index) => (
+              <div key={title} className={`grid gap-4 p-5 sm:grid-cols-[52px_minmax(0,1fr)] ${index !== providerFlow.length - 1 ? "border-b border-slate-200" : ""}`}>
+                <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-600 text-sm font-semibold text-white">{number}</span>
+                <div>
+                  <h3 className="font-semibold text-slate-950">{title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="ozellikler" className="border-b border-slate-200 bg-slate-50 py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Platform yetenekleri" title="Pilot müşteriden kurumsal operasyona uzanan çalışma alanı" description="Dağınık Excel listeleri, manuel başlık riski ve belirsiz provider sonuçları yerine ekiplerin tekrar kullanabileceği kontrollü akış." />
+          <SectionHeading eyebrow="Platform yetenekleri" title="Pilot müşteriden kurumsal operasyona uzanan çalışma alanı" description="Dağınık Excel listeleri, manuel başlık riski ve belirsiz sağlayıcı sonuçları yerine ekiplerin tekrar kullanabileceği kontrollü akış." />
           <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 md:grid-cols-2 lg:grid-cols-4">
             {capabilities.map(([title, description, icon]) => (
               <article key={title} className="flex min-h-64 flex-col bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
@@ -118,7 +159,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="platform" className="py-20 sm:py-24">
+      <section id="nasil-calisir" className="py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <SectionHeading eyebrow="Nasıl çalışır?" title="İlk talepten pilot kullanıma kadar kontrollü süreç" description="Firma sağlayıcı hesabı ve onaylı başlık hazırlandıktan sonra müşteri kurulum checklist'iyle ilk test kampanyasına ilerler." />
           <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -135,7 +176,7 @@ export default function Home() {
 
       <section id="operasyon" className="border-y border-slate-200 bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Operasyon katmanı" title="Müşteri paneli ve admin takibi aynı hedefe çalışır" description="Müşteri kendi kurulumunu ve bildirimlerini görürken, admin firma onboarding, satış/pilot durumu ve provider hazırlığını takip eder." />
+          <SectionHeading eyebrow="Operasyon katmanı" title="Müşteri paneli ve admin takibi aynı hedefe çalışır" description="Müşteri kendi kurulumunu ve bildirimlerini görürken, admin firma onboarding, satış/pilot durumu ve sağlayıcı hazırlığını takip eder." />
           <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {operations.map(([title, description]) => (
               <article key={title} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -151,14 +192,14 @@ export default function Home() {
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center">
           <div>
             <p className="text-sm font-semibold text-blue-700">Güvenlik temelden başlar</p>
-            <h2 className="mt-3 max-w-xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Firma erişimi, provider bilgileri ve operasyon yetkileri ayrıştırılır.</h2>
-            <p className="mt-5 max-w-xl leading-7 text-slate-600">Kritik SMS operasyonları için kullanıcı rolleri, firma sınırları, provider secret yönetimi, API rate limit, webhook imzası ve audit log ayrı güvenlik katmanlarıyla yönetilir.</p>
+            <h2 className="mt-3 max-w-xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Firma erişimi, sağlayıcı bilgileri ve operasyon yetkileri ayrıştırılır.</h2>
+            <p className="mt-5 max-w-xl leading-7 text-slate-600">Kritik SMS operasyonları için kullanıcı rolleri, firma sınırları, sağlayıcı secret yönetimi, API rate limit, webhook imzası ve audit log ayrı güvenlik katmanlarıyla yönetilir.</p>
             <Link href="/demo-request" className="mt-7 inline-flex items-center text-sm font-semibold text-blue-700 hover:text-blue-800">Güvenli onboarding başlatın <span className="ml-2">→</span></Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
               ["company", "Firma Bazlı İzolasyon", "Her kullanıcı yalnızca kabul edilmiş ve aktif firma üyeliklerine erişir."],
-              ["shield", "Gizli Provider Bilgisi", "Provider secret kullanıcı ekranlarında ve API yanıtlarında gösterilmez."],
+              ["shield", "Gizli Sağlayıcı Bilgisi", "Sağlayıcı secret kullanıcı ekranlarında ve API yanıtlarında gösterilmez."],
               ["api", "API ve Webhook Kontrolü", "API anahtarları, rate limit, imzalı webhook ve audit kayıtları izlenebilir."],
             ].map(([icon, title, description]) => (
               <article key={title} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -171,9 +212,23 @@ export default function Home() {
         </div>
       </section>
 
+      <section id="sss" className="border-b border-slate-200 bg-white py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
+          <SectionHeading eyebrow="Sıkça sorulan sorular" title="Müşterinin ilk görüşmede soracağı temel konular net." description="Platformun ne sattığı, sağlayıcı ilişkisinin nerede durduğu ve canlı gönderime geçiş şartları açık şekilde anlatılır." />
+          <div className="grid gap-3">
+            {faqs.map(([question, answer]) => (
+              <article key={question} className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+                <h3 className="font-semibold text-slate-950">{question}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{answer}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="iletisim" className="bg-[#071426] py-16 text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 sm:px-8 lg:flex-row lg:items-center">
-          <div><p className="text-sm font-semibold text-blue-300">Kontrollü beta programı</p><h2 className="mt-2 text-3xl font-semibold">SMS sağlayıcı hesabınızı operasyon paneline dönüştürün.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">İhtiyaçlarınızı değerlendirelim, firma onboarding ve provider bağlantı sürecini birlikte hazırlayalım.</p></div>
+          <div><p className="text-sm font-semibold text-blue-300">Kontrollü beta programı</p><h2 className="mt-2 text-3xl font-semibold">SMS sağlayıcı hesabınızı operasyon paneline dönüştürün.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">İhtiyaçlarınızı değerlendirelim, sağlayıcı seçimi, firma onboarding ve bağlantı sürecini birlikte hazırlayalım.</p></div>
           <Link href="/demo-request" className="shrink-0 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500">Demo Talep Et</Link>
         </div>
       </section>
@@ -188,12 +243,13 @@ function Navbar() {
     <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-xl">
       <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-8">
         <Link href="/" aria-label="MSGNEX ana sayfa" className="flex items-center"><BrandLogo size="md" className="h-14 max-w-[220px]" /></Link>
-        <nav className="hidden items-center gap-10 text-lg font-semibold text-slate-800 lg:flex">
+        <nav className="hidden items-center gap-7 text-base font-semibold text-slate-800 lg:flex">
           <a href="#konum" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Yaklaşım</a>
+          <a href="#saglayici" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Sağlayıcı</a>
           <a href="#ozellikler" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Özellikler</a>
-          <a href="#platform" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Platform</a>
+          <a href="#nasil-calisir" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Süreç</a>
           <a href="#guvenlik" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Güvenlik</a>
-          <a href="#iletisim" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">İletişim</a>
+          <a href="#sss" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">SSS</a>
         </nav>
         <div className="flex items-center gap-2">
           <Link href="/login" className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 sm:px-5 sm:text-base">Giriş Yap</Link>
@@ -228,7 +284,7 @@ function DashboardMockup() {
           <div className="min-w-0 bg-[#f6f8fc] p-4 text-slate-950 sm:p-5">
             <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-semibold text-blue-700">OPERASYON ÖZETİ</p><p className="mt-1 text-base font-semibold">Genel Bakış</p></div><span className="rounded-md bg-blue-600 px-3 py-2 text-[9px] font-semibold text-white">SMS Gönder</span></div>
             <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[["Kurulum", "%82", "blue"], ["İletildi", "%96,8", "green"], ["Audit", "124", "navy"], ["Provider", "Hazır", "amber"]].map(([label, value, tone]) => (
+              {[["Kurulum", "%82", "blue"], ["İletildi", "%96,8", "green"], ["Audit", "124", "navy"], ["Sağlayıcı", "Hazır", "amber"]].map(([label, value, tone]) => (
                 <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm"><span className={`block h-1.5 w-6 rounded-full ${tone === "green" ? "bg-emerald-500" : tone === "amber" ? "bg-amber-500" : tone === "navy" ? "bg-slate-800" : "bg-blue-600"}`} /><p className="mt-3 text-[9px] text-slate-500">{label}</p><p className="mt-1 text-base font-semibold">{value}</p></div>
               ))}
             </div>
@@ -276,10 +332,10 @@ function Footer() {
           <BrandLogo size="lg" className="h-auto w-[240px] max-w-full" />
           <p className="mt-5 max-w-sm text-sm leading-7 text-slate-600">Kendi SMS sağlayıcı hesabınızı kullanarak müşteri iletişiminizi güvenli, ölçülebilir ve kontrollü biçimde tek panelden yönetin.</p>
         </div>
-        <FooterColumn title="Platform" links={[["Yaklaşım", "#konum"], ["Özellikler", "#ozellikler"], ["Kampanyalar", "#platform"], ["Operasyon", "#operasyon"]]} />
+        <FooterColumn title="Platform" links={[["Yaklaşım", "#konum"], ["Sağlayıcı Seçimi", "#saglayici"], ["Özellikler", "#ozellikler"], ["Operasyon", "#operasyon"]]} />
         <FooterColumn title="Kurumsal" links={[["Güvenlik", "#guvenlik"], ["KVKK", "/kvkk"], ["Gizlilik Politikası", "/privacy"], ["Kullanım Şartları", "/terms"]]} />
-        <FooterColumn title="Destek" links={[["İletişim", "#iletisim"], ["Demo Talep Et", "/demo-request"], ["Giriş Yap", "/login"]]} />
-        <FooterColumn title="Hakkımızda" links={[["MSGNEX Hakkında", "#platform"], ["Beta Programı", "/demo-request"], ["Güvenli Altyapı", "#guvenlik"]]} />
+        <FooterColumn title="Destek" links={[["SSS", "#sss"], ["İletişim", "#iletisim"], ["Demo Talep Et", "/demo-request"], ["Giriş Yap", "/login"]]} />
+        <FooterColumn title="Hakkımızda" links={[["MSGNEX Hakkında", "#nasil-calisir"], ["Beta Programı", "/demo-request"], ["Güvenli Altyapı", "#guvenlik"]]} />
       </div>
       <div className="border-t border-slate-200">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-6 text-sm text-slate-500 sm:px-8 md:flex-row md:items-center md:justify-between">
