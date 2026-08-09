@@ -215,12 +215,17 @@ export default function Home() {
       <section id="sss" className="border-b border-slate-200 bg-white py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
           <SectionHeading eyebrow="Sıkça sorulan sorular" title="Müşterinin ilk görüşmede soracağı temel konular net." description="Platformun ne sattığı, sağlayıcı ilişkisinin nerede durduğu ve canlı gönderime geçiş şartları açık şekilde anlatılır." />
-          <div className="grid gap-3">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
             {faqs.map(([question, answer]) => (
-              <article key={question} className="rounded-lg border border-slate-200 bg-slate-50 p-5">
-                <h3 className="font-semibold text-slate-950">{question}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{answer}</p>
-              </article>
+              <details key={question} className="group border-b border-slate-200 last:border-b-0">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 bg-white px-5 py-5 transition-colors hover:bg-slate-50 [&::-webkit-details-marker]:hidden sm:px-6">
+                  <span className="font-semibold text-slate-950">{question}</span>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-500 transition-all group-open:rotate-45 group-open:border-blue-200 group-open:bg-blue-50 group-open:text-blue-700">+</span>
+                </summary>
+                <div className="bg-slate-50 px-5 pb-5 pr-14 sm:px-6">
+                  <p className="text-sm leading-6 text-slate-600">{answer}</p>
+                </div>
+              </details>
             ))}
           </div>
         </div>
