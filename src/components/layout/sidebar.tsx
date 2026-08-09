@@ -26,6 +26,7 @@ type IconName =
   | "suppression"
   | "provider"
   | "api"
+  | "plan"
   | "companies"
   | "users"
   | "logs"
@@ -46,6 +47,7 @@ const customerNav: NavItem[] = [
   { label: "Kara Liste", href: "/suppression", icon: "suppression" },
   { label: "Provider Bağlantısı", href: "/provider", icon: "provider" },
   { label: "API Anahtarları", href: "/api-keys", icon: "api" },
+  { label: "Planım", href: "/plan", icon: "plan" },
 ]
 
 const adminNav: NavItem[] = [
@@ -164,6 +166,8 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M4 7h16v12H4z" /><path d="M16 7V5H6" /><circle cx="12" cy="13" r="2" /></svg>
     case "api":
       return <svg {...common}><path d="M8 9 4 12l4 3" /><path d="m16 9 4 3-4 3" /><path d="m14 5-4 14" /></svg>
+    case "plan":
+      return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8 8h8" /><path d="M8 12h8" /><path d="M8 16h4" /></svg>
     case "companies":
       return <svg {...common}><path d="M4 21V5h10v16" /><path d="M14 9h6v12" /><path d="M8 9h2" /><path d="M8 13h2" /><path d="M8 17h2" /></svg>
     case "users":

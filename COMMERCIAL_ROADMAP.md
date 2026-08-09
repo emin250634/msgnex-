@@ -265,6 +265,12 @@ Ticari etkisi:
 
 Amaç: Ürünü satılabilir paketlere bölmek.
 
+Başlanan işler:
+
+- Panel içine Planım/Paketler sayfası eklendi.
+- SMS kredisi içermeyen yazılım paketi konumlandırması netleştirildi.
+- Başlangıç, Profesyonel ve Ajans/Kurumsal paketleri karşılaştırıldı.
+
 Önerilen paketler:
 
 1. Başlangıç
