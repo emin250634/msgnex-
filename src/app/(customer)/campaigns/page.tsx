@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { calculateSmsSegments } from "@/lib/sms-segments"
 import { createClient } from "@/lib/supabase/client"
-import type { Group, SmsCampaign } from "@/types"
+import type { Group, SmsCampaign, SmsMessage } from "@/types"
 
 type CampaignStatusFilter = "all" | SmsCampaign["status"]
 type DlrFilter = "all" | "awaiting" | "checked" | "completed" | "none"
@@ -102,6 +102,9 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [cancelTarget, setCancelTarget] = useState<SmsCampaign | null>(null)
+  const [detailTarget, setDetailTarget] = useState<SmsCampaign | null>(null)
+  const [detailMessages, setDetailMessages] = useState<SmsMessage[]>([])
+  const [detailLoading, setDetailLoading] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [search, setSearch] = useState("")
@@ -198,6 +201,23 @@ export default function CampaignsPage() {
     toast.success("Kampanya iptal edildi")
     setCancelTarget(null)
     load()
+  }
+
+  const openDetails = async (campaign: SmsCampaign) => {
+    setDetailTarget(campaign)
+    setDetailMessages([])
+    setDetailLoading(true)
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from("sms_messages")
+      .select("*")
+      .eq("campaign_id", campaign.id)
+      .order("created_at", { ascending: false })
+      .limit(500)
+
+    if (error) toast.error(error.message)
+    setDetailMessages(data ?? [])
+    setDetailLoading(false)
   }
 
   if (loading) {
@@ -305,6 +325,9 @@ export default function CampaignsPage() {
                   <StatusBadge label={providerStatusLabel(campaign.provider_status)} tone={providerStatusTone(campaign.provider_status)} />
                   <StatusBadge label={`${campaign.provider_pending_count ?? 0} bekleyen`} tone="warning" />
                 </div>
+                <Button variant="secondary" size="sm" className="mt-4 w-full" onClick={() => openDetails(campaign)}>
+                  Rapor
+                </Button>
                 {campaign.status === "queued" && (
                   <Button variant="danger" size="sm" className="mt-4 w-full" onClick={() => setCancelTarget(campaign)}>
                     İptal Et
@@ -390,11 +413,16 @@ export default function CampaignsPage() {
                   </Td>
                   <Td className="text-sm text-gray-500">{formatDate(campaign.dlr_last_checked_at)}</Td>
                   <Td>
-                    {campaign.status === "queued" && (
-                      <Button variant="danger" size="sm" onClick={() => setCancelTarget(campaign)}>
-                        İptal Et
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => openDetails(campaign)}>
+                        Rapor
                       </Button>
-                    )}
+                      {campaign.status === "queued" && (
+                        <Button variant="danger" size="sm" onClick={() => setCancelTarget(campaign)}>
+                          İptal Et
+                        </Button>
+                      )}
+                    </div>
                   </Td>
                 </Tr>
               )
@@ -449,6 +477,90 @@ export default function CampaignsPage() {
           </Card>
         </div>
       )}
+
+      {detailTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 p-4">
+          <Card title="Kampanya Raporu" className="max-h-[90vh] w-full max-w-5xl overflow-y-auto shadow-2xl">
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-950">{detailTarget.name || "SMS Kampanyası"}</p>
+                  <p className="mt-1 text-sm text-gray-500">{formatDate(detailTarget.created_at)}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge label={statusLabels[detailTarget.status]} tone={detailTarget.status === "completed" ? "success" : detailTarget.status === "failed" ? "danger" : "warning"} />
+                  <StatusBadge label={providerStatusLabel(detailTarget.provider_status)} tone={providerStatusTone(detailTarget.provider_status)} />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                <ReportMetric label="Alıcı" value={detailTarget.total_recipients.toString()} />
+                <ReportMetric label="Atlanan" value={(detailTarget.skipped_recipients ?? 0).toString()} tone="amber" />
+                <ReportMetric label="Başarılı" value={(detailTarget.provider_success_count ?? detailTarget.success_count ?? 0).toString()} tone="emerald" />
+                <ReportMetric label="Hatalı" value={(detailTarget.provider_failed_count ?? detailTarget.fail_count ?? 0).toString()} tone="red" />
+                <ReportMetric label="Bekleyen" value={(detailTarget.provider_pending_count ?? 0).toString()} tone="amber" />
+                <ReportMetric label="Tahmini Birim" value={`${estimatedProviderUnits(detailTarget)}`} />
+              </div>
+
+              <div className="grid gap-4 text-sm md:grid-cols-2">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold uppercase text-gray-500">Provider</p>
+                  <p className="mt-2 font-semibold text-gray-950">{detailTarget.provider_name || "-"}</p>
+                  <p className="mt-1 font-mono text-xs text-gray-500">{detailTarget.provider_bulk_id || "Bulk ID yok"}</p>
+                  <p className="mt-2 text-gray-600">{detailTarget.provider_status_text || "Provider açıklaması yok"}</p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-xs font-semibold uppercase text-gray-500">Mesaj</p>
+                  <p className="mt-2 max-h-28 overflow-y-auto whitespace-pre-wrap text-sm leading-6 text-gray-700">{detailTarget.message}</p>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-950">Alıcı Sonuçları</p>
+                  <span className="text-xs text-gray-500">En fazla 500 kayıt gösteriliyor</span>
+                </div>
+                {detailLoading ? (
+                  <LoadingState variant="table" rows={5} />
+                ) : detailMessages.length > 0 ? (
+                  <Table>
+                    <THead>
+                      <Tr>
+                        <Th>Alıcı</Th>
+                        <Th>Başlık</Th>
+                        <Th>Durum</Th>
+                        <Th>Provider</Th>
+                        <Th>Kod / Açıklama</Th>
+                        <Th>Tarih</Th>
+                      </Tr>
+                    </THead>
+                    <TBody>
+                      {detailMessages.map((message) => (
+                        <Tr key={message.id}>
+                          <Td className="font-mono text-sm">{message.recipient}</Td>
+                          <Td className="font-mono text-xs">{message.sender_id}</Td>
+                          <Td><StatusBadge label={messageStatusLabel(message.status)} tone={messageStatusTone(message.status)} /></Td>
+                          <Td>{message.provider_name || "-"}</Td>
+                          <Td className="max-w-xs truncate" title={message.provider_status_text || message.provider_error || undefined}>
+                            {message.provider_status_code || "-"} {message.provider_status_text || message.provider_error || ""}
+                          </Td>
+                          <Td className="text-sm text-gray-500">{formatDate(message.created_at)}</Td>
+                        </Tr>
+                      ))}
+                    </TBody>
+                  </Table>
+                ) : (
+                  <EmptyState title="Mesaj sonucu yok" description="Bu kampanya için alıcı bazlı kayıt bulunamadı." />
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="secondary" onClick={() => setDetailTarget(null)}>Kapat</Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
@@ -466,6 +578,35 @@ function CancelMetric({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
       <p className="mt-2 text-lg font-semibold text-gray-950">{value}</p>
+    </div>
+  )
+}
+
+function messageStatusLabel(status: SmsMessage["status"]) {
+  if (status === "delivered") return "Teslim edildi"
+  if (status === "sent") return "Gönderildi"
+  if (status === "failed") return "Hata"
+  return "Bekliyor"
+}
+
+function messageStatusTone(status: SmsMessage["status"]) {
+  if (status === "delivered" || status === "sent") return "success" as const
+  if (status === "failed") return "danger" as const
+  return "warning" as const
+}
+
+function ReportMetric({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "emerald" | "red" | "amber" }) {
+  const classes = {
+    slate: "border-gray-200 bg-white text-gray-950",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
+    red: "border-red-200 bg-red-50 text-red-950",
+    amber: "border-amber-200 bg-amber-50 text-amber-950",
+  }
+
+  return (
+    <div className={`rounded-xl border p-4 ${classes[tone]}`}>
+      <p className="text-xs font-semibold uppercase opacity-70">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
   )
 }

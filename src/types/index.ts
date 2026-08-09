@@ -102,6 +102,7 @@ export interface SmsMessage {
   provider_message_id: string | null
   provider_status_code: string | null
   provider_status_text: string | null
+  provider_error: string | null
   provider_raw_status: unknown | null
   accepted_at: string | null
   sent_at: string | null

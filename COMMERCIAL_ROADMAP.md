@@ -183,6 +183,16 @@ Ticari etkisi:
 
 Amaç: Müşteriye gönderim sonrası net sonuç göstermek.
 
+Başlanan işler:
+
+- Kampanya rapor modalı eklendi:
+  - toplam alıcı
+  - atlanan kayıt
+  - başarılı/hatalı/bekleyen provider sonuçları
+  - provider bulk bilgisi
+  - alıcı bazlı mesaj durumu
+  - provider kodu/açıklaması
+
 Yapılacaklar:
 
 - Kampanya detay raporu:
