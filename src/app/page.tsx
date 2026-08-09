@@ -2,52 +2,49 @@ import Link from "next/link"
 import { BrandLogo } from "@/components/ui/brand-logo"
 
 const capabilities = [
-  ["Kendi Sağlayıcı Hesabınız", "Yetkili SMS sağlayıcınızdan aldığınız hesabı MSGNEX'e bağlayın; SMS bakiyesi sağlayıcı tarafında kalır.", "provider"],
-  ["Onaylı Başlık Güvenliği", "Gönderici başlığı panelden rastgele yazılmaz, sağlayıcıdan gelen onaylı başlık kullanılır.", "shield"],
-  ["Kampanya ve CRM Yönetimi", "Kişi, segment, şablon, kara liste ve kampanya süreçlerini tek panelden yönetin.", "campaign"],
-  ["Raporlama ve Denetim", "Sağlayıcı sonucu, başarısız numara, audit log, API ve webhook olaylarını izleyin.", "chart"],
+  ["Kendi Sağlayıcı Hesabınız", "Mevcut SMS sağlayıcı hesabınızı güvenli bağlantı ile kullanmaya devam edin.", "provider"],
+  ["Kişi ve Grup Yönetimi", "Müşteri listelerinizi, gruplarınızı ve segmentlerinizi merkezi panelden düzenleyin.", "contacts"],
+  ["Kampanya Yönetimi", "Toplu SMS ve kurumsal SMS kampanyalarınızı kontrollü şekilde hazırlayın.", "campaign"],
+  ["Onaylı Gönderici Başlığı", "Gönderimler yalnızca sağlayıcı hesabınızda onaylı başlıklarla ilerler.", "shield"],
+  ["Gönderim ve Teslimat Takibi", "Gönderimlerinizin durumunu ve teslimat takibini panelden izleyin.", "send"],
+  ["Detaylı Raporlama", "SMS raporlama ekranlarıyla kampanya sonuçlarını daha görünür hale getirin.", "chart"],
+  ["Rol Bazlı Kullanıcı Yönetimi", "Ekip üyelerinin hangi işlemleri yapabileceğini kullanıcı yetkilendirmesiyle belirleyin.", "company"],
+  ["SMS API Entegrasyonu", "Uygulamalarınızı mevcut SMS yönetimi sürecinize API üzerinden bağlayın.", "api"],
 ]
 
 const trustItems = [
   ["Kendi SMS bakiyenizi kullanın", "Mevcut hesabınızla ilerleyin"],
   ["Onaylı başlık", "Marka taklidi engellenir"],
-  ["Kurulum checklist", "Pilot başlangıç netleşir"],
-  ["Audit ve uyarılar", "Operasyon izlenebilir"],
+  ["Kurulum kontrolü", "Pilot başlangıç netleşir"],
+  ["İşlem kayıtları", "Operasyon izlenebilir"],
 ]
 
 const steps = [
-  ["01", "Demo Talebi", "Firmanızın iletişim hacmini ve ihtiyaçlarını paylaşın."],
-  ["02", "Sağlayıcı Hazırlığı", "Yetkili SMS sağlayıcı hesabınız ve onaylı başlığınız doğrulanır."],
-  ["03", "Pilot Kurulum", "Kişi listesi, test segmenti, ilk şablon ve test kampanyası checklist ile tamamlanır."],
-  ["04", "Operasyon Takibi", "Kampanya sonuçları, API/webhook olayları, bildirimler ve audit kayıtları izlenir."],
+  ["01", "Demo Talebi", "Firmanızın SMS ihtiyacını, mevcut sağlayıcınızı ve kullanım hedeflerinizi paylaşın."],
+  ["02", "Sağlayıcı Hazırlığı", "SMS sağlayıcı hesabınız, bakiyeniz ve onaylı gönderici başlığınız netleştirilir."],
+  ["03", "Pilot Kurulum", "Kişiler, gruplar ve ilk test kampanyası kontrollü şekilde hazırlanır."],
+  ["04", "Operasyon Takibi", "Gönderim raporları, teslimat takibi ve kullanıcı yetkileri tek panelden izlenir."],
 ]
 
 const differentiators = [
-  ["Mevcut SMS hesabınızı kullanmaya devam edin", "MSGNEX; kişi yönetimi, kampanyalar, API, raporlama ve kullanıcı yetkilendirmesini tek platformda bir araya getirir."],
-  ["Başlık sağlayıcıdan gelir", "Firma panelde farklı marka adı yazamaz. Gönderimler sadece sağlayıcı hesabında tanımlı başlıkla hazırlanır."],
-  ["Pilot süreci takip edilir", "Müşteri kurulum ekranı ve admin onboarding takibiyle sağlayıcı, kişi listesi ve ilk test kampanyası kontrol altında ilerler."],
-]
-
-const operations = [
-  ["Kurulum", "Sağlayıcı bağlantısı, başlık, kişi listesi ve test kampanyası adımları görünür."],
-  ["Gönderim", "İzin, kara liste, segment, SMS parçası ve sağlayıcı başlığı gönderim öncesi kontrol edilir."],
-  ["Raporlama", "Başarılı, hatalı, bekleyen ve sağlayıcı hata kodları kampanya raporunda ayrılır."],
-  ["Entegrasyon", "API key, rate limit, webhook secret ve delivery gözlemi kurumsal entegrasyonlara hazırlanır."],
+  ["Merkezi yönetim", "Kişi listeleri, gruplar, kampanyalar ve gönderim raporları farklı dosyalara dağılmadan tek panelde toplanır."],
+  ["Daha görünür süreç", "Hangi kampanyanın hazırlandığını, kimlerin işlem yaptığını ve sonuçların ne durumda olduğunu kolayca takip edersiniz."],
+  ["Kontrollü ekip kullanımı", "Kullanıcı yetkilendirmesiyle ekiplerin yalnızca ihtiyaç duyduğu alanlara erişmesini sağlarsınız."],
 ]
 
 const providerFlow = [
-  ["1", "Sağlayıcı seçimi", "İhtiyaca ve fiyat tekliflerine göre yetkili SMS sağlayıcı alternatifleri değerlendirilir."],
-  ["2", "Firma hesabı", "Hesap, SMS gönderecek firmanın kendi adına açılır ve onaylı başlık sağlayıcı tarafında tanımlanır."],
-  ["3", "MSGNEX bağlantısı", "Uygun sağlayıcı entegrasyonu panelde yapılandırılır; gönderim, raporlama ve denetim MSGNEX üzerinden yönetilir."],
+  ["1", "Sağlayıcı seçimi", "Firma kendi yetkili SMS sağlayıcısını kullanır."],
+  ["2", "Firma hesabı", "SMS bakiyesi ve gönderici başlığı sağlayıcı hesabında kalır."],
+  ["3", "MSGNEX bağlantısı", "Kampanya, kişi, gönderim ve raporlama süreçleri MSGNEX üzerinden yönetilir."],
 ]
 
 const faqs = [
-  ["SMS bakiyemi nasıl kullanırım?", "Mevcut SMS hesabınızı kullanmaya devam edersiniz. MSGNEX, sağlayıcı hesabınızı merkezi kampanya, raporlama, API ve yetki yönetimi süreçlerine bağlar."],
-  ["Hangi SMS sağlayıcısını kullanabilirim?", "Firma ihtiyacına göre farklı yetkili sağlayıcılar değerlendirilebilir. Her sağlayıcının API yapısı farklı olabileceği için entegrasyon durumu ayrıca planlanır."],
-  ["Gönderici başlığını panelden değiştirebilir miyim?", "Hayır. Gönderimler yalnızca sağlayıcı hesabınızda onaylı görünen başlıkla hazırlanır. Bu sayede farklı marka adıyla gönderim riski azaltılır."],
-  ["Müşterilerim bu panelde ne yapar?", "Kişi listelerini, segmentleri, şablonları, kampanyaları, gönderim sonuçlarını, API anahtarlarını, webhook ayarlarını ve bildirimleri yönetir."],
-  ["Canlı SMS göndermeden test yapılabilir mi?", "Evet. Pilot aşamada test modu ve kurulum checklist'iyle akış doğrulanabilir. Canlı gönderim için sağlayıcı hesabı ve onaylı başlık hazır olmalıdır."],
-  ["MSGNEX ne zaman avantaj sağlar?", "SMS süreci Excel, manuel takip ve dağınık raporlardan çıkıp ekiplerin kullanabileceği kontrollü, izlenebilir ve tekrar edilebilir bir operasyona dönüştüğünde."],
+  ["SMS bakiyemi nasıl kullanırım?", "Mevcut SMS sağlayıcı hesabınızı kullanmaya devam edersiniz. MSGNEX, bu hesabı merkezi kampanya yönetimi, gönderim raporu ve kullanıcı yetkilendirmesi süreçlerine bağlar."],
+  ["Hangi SMS sağlayıcısını kullanabilirim?", "Kurumunuzun kullandığı yetkili SMS sağlayıcısı değerlendirilir. Entegrasyon durumu sağlayıcının API yapısına göre netleştirilir."],
+  ["Gönderici başlığını panelden değiştirebilir miyim?", "Gönderimler yalnızca sağlayıcı hesabınızda onaylı görünen başlıklarla hazırlanır. Bu yaklaşım marka güvenliğini korur."],
+  ["Firma kullanıcıları panelde neler yapabilir?", "Yetkilerine göre kişi listelerini, grupları, kampanyaları, gönderim sonuçlarını, SMS API ayarlarını ve bildirimleri yönetebilirler."],
+  ["Canlı SMS göndermeden test yapılabilir mi?", "Pilot aşamada kurulum akışı ve test süreçleri doğrulanabilir. Canlı gönderim için sağlayıcı hesabı ve onaylı başlık hazır olmalıdır."],
+  ["MSGNEX ne zaman avantaj sağlar?", "Kurumsal SMS ve toplu SMS süreçleri manuel takipten çıkıp merkezi, ölçülebilir ve ekiplerle yönetilebilir hale geldiğinde."],
 ]
 
 export default function Home() {
@@ -76,7 +73,7 @@ export default function Home() {
                 Demo Talep Et
                 <span className="ml-2" aria-hidden="true">→</span>
               </Link>
-              <a href="#nasil-calisir" className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-white/5 px-7 py-4 text-base font-semibold text-white backdrop-blur transition-all hover:-translate-y-0.5 hover:bg-white/10">
+              <a href="#ozellikler" className="inline-flex items-center justify-center rounded-lg border border-white/25 bg-white/5 px-7 py-4 text-base font-semibold text-white backdrop-blur transition-all hover:-translate-y-0.5 hover:bg-white/10">
                 Platformu İncele
               </a>
             </div>
@@ -106,7 +103,7 @@ export default function Home() {
 
       <section id="konum" className="border-b border-slate-200 bg-white py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start">
-          <SectionHeading eyebrow="MSGNEX neyi çözer?" title="SMS göndermekten fazlası: kontrollü müşteri iletişim operasyonu" description="Sağlayıcı hesabı sizde kalır. MSGNEX bu hesabın etrafına CRM, kampanya, izin, kara liste, raporlama, API, webhook ve denetim katmanı ekler." />
+          <SectionHeading eyebrow="MSGNEX neyi çözer?" title="SMS süreçleriniz dağınık kalmasın" description="Kişilerinizi, kampanyalarınızı, gönderim sonuçlarınızı ve ekip yetkilerini tek merkezde yönetin. Mevcut SMS sağlayıcınızı değiştirmeden daha düzenli, görünür ve kontrollü bir çalışma yapısına geçin." />
           <div className="grid gap-4">
             {differentiators.map(([title, description]) => (
               <article key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-5">
@@ -122,10 +119,10 @@ export default function Home() {
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-center">
           <div>
             <p className="text-sm font-semibold text-blue-700">Sağlayıcı bağımsız yaklaşım</p>
-            <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Müşteri sağlayıcıyı seçer, MSGNEX operasyonu düzenler.</h2>
-            <p className="mt-5 max-w-xl leading-7 text-slate-600">Fiyat, paket, başlık ve yasal süreçler SMS sağlayıcısı tarafında ilerler. MSGNEX tarafında ise bu hesabın ekipler tarafından güvenli, ölçülebilir ve kontrollü kullanılması sağlanır.</p>
+            <h2 className="mt-3 max-w-2xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">SMS sağlayıcınızı siz seçin. Operasyonu MSGNEX yönetsin.</h2>
+            <p className="mt-5 max-w-xl leading-7 text-slate-600">Kendi SMS bakiyenizi kullanın. MSGNEX, mevcut sağlayıcı hesabınızla çalışarak kurumsal iletişim platformu ihtiyacınızı merkezi yönetim, kampanya yönetimi ve SMS raporlama katmanıyla tamamlar.</p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              {["Sağlayıcı teklifleri karşılaştırılabilir", "Hesap firma adına açılır", "Onaylı başlık korunur", "Panel operasyonu standartlaştırır"].map((item) => (
+              {["Kendi SMS bakiyenizi kullanın", "Hesap firma adına kalır", "Onaylı başlık korunur", "Panel operasyonu standartlaştırır"].map((item) => (
                 <div key={item} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">{item}</div>
               ))}
             </div>
@@ -146,7 +143,7 @@ export default function Home() {
 
       <section id="ozellikler" className="border-b border-slate-200 bg-slate-50 py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Platform yetenekleri" title="Pilot müşteriden kurumsal operasyona uzanan çalışma alanı" description="Dağınık Excel listeleri, manuel başlık riski ve belirsiz sağlayıcı sonuçları yerine ekiplerin tekrar kullanabileceği kontrollü akış." />
+          <SectionHeading eyebrow="Platform yetenekleri" title="SMS yönetimi için ihtiyacınız olan her şey" description="Kişi yönetimi, SMS kampanya yönetimi, teslimat takibi, SMS API ve gönderim raporu süreçlerini tek panelden yürütün." />
           <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 md:grid-cols-2 lg:grid-cols-4">
             {capabilities.map(([title, description, icon]) => (
               <article key={title} className="flex min-h-64 flex-col bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
@@ -161,7 +158,7 @@ export default function Home() {
 
       <section id="nasil-calisir" className="py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Nasıl çalışır?" title="İlk talepten pilot kullanıma kadar kontrollü süreç" description="Firma sağlayıcı hesabı ve onaylı başlık hazırlandıktan sonra müşteri kurulum checklist'iyle ilk test kampanyasına ilerler." />
+          <SectionHeading eyebrow="Nasıl çalışır?" title="Demo talebinden kullanıma geçişe kadar sade bir akış" description="Demo talebinizden sonra ekibinizin ihtiyacı, SMS sağlayıcı hazırlığı ve ilk kullanım adımları birlikte netleştirilir." />
           <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {steps.map(([number, title, description]) => (
               <article key={number} className="relative border-t-2 border-blue-600 pt-6">
@@ -174,33 +171,19 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="operasyon" className="border-y border-slate-200 bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Operasyon katmanı" title="Müşteri paneli ve admin takibi aynı hedefe çalışır" description="Müşteri kendi kurulumunu ve bildirimlerini görürken, admin firma onboarding, satış/pilot durumu ve sağlayıcı hazırlığını takip eder." />
-          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {operations.map(([title, description]) => (
-              <article key={title} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-semibold text-blue-700">{title}</p>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section id="guvenlik" className="border-y border-slate-200 bg-[#f5f8fc] py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center">
           <div>
-            <p className="text-sm font-semibold text-blue-700">Güvenlik temelden başlar</p>
-            <h2 className="mt-3 max-w-xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Firma erişimi, sağlayıcı bilgileri ve operasyon yetkileri ayrıştırılır.</h2>
-            <p className="mt-5 max-w-xl leading-7 text-slate-600">Kritik SMS operasyonları için kullanıcı rolleri, firma sınırları, sağlayıcı secret yönetimi, API rate limit, webhook imzası ve audit log ayrı güvenlik katmanlarıyla yönetilir.</p>
-            <Link href="/demo-request" className="mt-7 inline-flex items-center text-sm font-semibold text-blue-700 hover:text-blue-800">Güvenli onboarding başlatın <span className="ml-2">→</span></Link>
+            <p className="text-sm font-semibold text-blue-700">Güvenlik</p>
+            <h2 className="mt-3 max-w-xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Verileriniz ve SMS operasyonunuz koruma altında</h2>
+            <p className="mt-5 max-w-xl leading-7 text-slate-600">Firma verileri, SMS sağlayıcı bağlantısı ve kullanıcı yetkileri ayrı güvenlik katmanlarıyla yönetilir. Ekipler yalnızca kendileri için tanımlanan alanlarda işlem yapar.</p>
+            <Link href="/demo-request" className="mt-7 inline-flex items-center text-sm font-semibold text-blue-700 hover:text-blue-800">Demo talep edin <span className="ml-2">→</span></Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              ["company", "Firma Bazlı İzolasyon", "Her kullanıcı yalnızca kabul edilmiş ve aktif firma üyeliklerine erişir."],
-              ["shield", "Gizli Sağlayıcı Bilgisi", "Sağlayıcı secret kullanıcı ekranlarında ve API yanıtlarında gösterilmez."],
-              ["api", "API ve Webhook Kontrolü", "API anahtarları, rate limit, imzalı webhook ve audit kayıtları izlenebilir."],
+              ["company", "Firma Bazlı Veri İzolasyonu", "Her firma yalnızca kendi verilerine erişir."],
+              ["shield", "Güvenli Sağlayıcı Bağlantısı", "SMS sağlayıcı bilgileriniz güvenli biçimde saklanır."],
+              ["contacts", "Rol Bazlı Yetkilendirme", "Kullanıcıların hangi işlemleri yapabileceğini siz belirlersiniz."],
             ].map(([icon, title, description]) => (
               <article key={title} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white"><FeatureIcon name={icon} /></span>
@@ -214,7 +197,7 @@ export default function Home() {
 
       <section id="sss" className="border-b border-slate-200 bg-white py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-          <SectionHeading eyebrow="Sıkça sorulan sorular" title="Müşterinin ilk görüşmede soracağı temel konular net." description="Platformun ne sattığı, sağlayıcı ilişkisinin nerede durduğu ve canlı gönderime geçiş şartları açık şekilde anlatılır." />
+          <SectionHeading eyebrow="Sıkça sorulan sorular" title="MSGNEX'i kullanmaya başlamadan önce bilmeniz gerekenler" description="Mevcut SMS sağlayıcınız, gönderici başlığı, SMS API ve canlı kullanıma geçiş hakkında temel sorular." />
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60">
             {faqs.map(([question, answer]) => (
               <details key={question} className="group border-b border-slate-200 last:border-b-0">
@@ -233,7 +216,7 @@ export default function Home() {
 
       <section id="iletisim" className="bg-[#071426] py-16 text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 sm:px-8 lg:flex-row lg:items-center">
-          <div><p className="text-sm font-semibold text-blue-300">Kontrollü beta programı</p><h2 className="mt-2 text-3xl font-semibold">SMS sağlayıcı hesabınızı operasyon paneline dönüştürün.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">İhtiyaçlarınızı değerlendirelim, sağlayıcı seçimi, firma onboarding ve bağlantı sürecini birlikte hazırlayalım.</p></div>
+          <div><p className="text-sm font-semibold text-blue-300">Demo talep edin</p><h2 className="mt-2 text-3xl font-semibold">SMS operasyonunuzu tek merkezden yönetmeye başlayın.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">MSGNEX&apos;i kurumunuzun mevcut SMS altyapısıyla nasıl kullanabileceğinizi birlikte değerlendirelim.</p></div>
           <Link href="/demo-request" className="shrink-0 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500">Demo Talep Et</Link>
         </div>
       </section>
@@ -289,7 +272,7 @@ function DashboardMockup() {
           <div className="min-w-0 bg-[#f6f8fc] p-4 text-slate-950 sm:p-5">
             <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-semibold text-blue-700">OPERASYON ÖZETİ</p><p className="mt-1 text-base font-semibold">Genel Bakış</p></div><span className="rounded-md bg-blue-600 px-3 py-2 text-[9px] font-semibold text-white">SMS Gönder</span></div>
             <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[["Kurulum", "%82", "blue"], ["İletildi", "%96,8", "green"], ["Audit", "124", "navy"], ["Sağlayıcı", "Hazır", "amber"]].map(([label, value, tone]) => (
+              {[["Kurulum", "%82", "blue"], ["İletildi", "%96,8", "green"], ["Kayıt", "124", "navy"], ["Sağlayıcı", "Hazır", "amber"]].map(([label, value, tone]) => (
                 <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm"><span className={`block h-1.5 w-6 rounded-full ${tone === "green" ? "bg-emerald-500" : tone === "amber" ? "bg-amber-500" : tone === "navy" ? "bg-slate-800" : "bg-blue-600"}`} /><p className="mt-3 text-[9px] text-slate-500">{label}</p><p className="mt-1 text-base font-semibold">{value}</p></div>
               ))}
             </div>
@@ -301,7 +284,7 @@ function DashboardMockup() {
                 </div>
                 <div className="mt-2 flex justify-between text-[7px] text-slate-400"><span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
               </div>
-              <div className="rounded-md bg-[#0a1b35] p-4 text-white shadow-sm"><p className="text-[9px] font-semibold text-blue-200">Başarı Oranı</p><div className="mx-auto mt-5 flex h-24 w-24 items-center justify-center rounded-full border-[10px] border-blue-500 border-r-blue-200/20"><div className="text-center"><p className="text-xl font-semibold">%96,8</p><p className="text-[7px] text-slate-400">iletim</p></div></div><div className="mt-5 flex items-center justify-between text-[8px]"><span className="text-slate-400">DLR bekleyen</span><span className="font-semibold text-amber-300">126</span></div></div>
+              <div className="rounded-md bg-[#0a1b35] p-4 text-white shadow-sm"><p className="text-[9px] font-semibold text-blue-200">Başarı Oranı</p><div className="mx-auto mt-5 flex h-24 w-24 items-center justify-center rounded-full border-[10px] border-blue-500 border-r-blue-200/20"><div className="text-center"><p className="text-xl font-semibold">%96,8</p><p className="text-[7px] text-slate-400">iletim</p></div></div><div className="mt-5 flex items-center justify-between text-[8px]"><span className="text-slate-400">Bekleyen</span><span className="font-semibold text-amber-300">126</span></div></div>
             </div>
             <div className="mt-3 rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[9px] font-semibold">Sıradaki Aksiyon</p><p className="mt-1 text-[8px] text-slate-400">Pilot kurulum checklist</p></div><div className="flex items-center gap-4 text-right"><div><p className="text-[7px] text-slate-400">Eksik</p><p className="text-[9px] font-semibold">Başlık sorgusu</p></div><div><p className="text-[7px] text-slate-400">Durum</p><p className="text-[9px] font-semibold text-amber-600">Takipte</p></div></div></div></div>
           </div>
@@ -337,7 +320,7 @@ function Footer() {
           <BrandLogo size="lg" className="h-auto w-[240px] max-w-full" />
           <p className="mt-5 max-w-sm text-sm leading-7 text-slate-600">Kendi SMS sağlayıcı hesabınızı kullanarak müşteri iletişiminizi güvenli, ölçülebilir ve kontrollü biçimde tek panelden yönetin.</p>
         </div>
-        <FooterColumn title="Platform" links={[["Yaklaşım", "#konum"], ["Sağlayıcı Seçimi", "#saglayici"], ["Özellikler", "#ozellikler"], ["Operasyon", "#operasyon"]]} />
+        <FooterColumn title="Platform" links={[["Yaklaşım", "#konum"], ["Sağlayıcı Seçimi", "#saglayici"], ["Özellikler", "#ozellikler"], ["Nasıl Çalışır", "#nasil-calisir"]]} />
         <FooterColumn title="Kurumsal" links={[["Güvenlik", "#guvenlik"], ["KVKK", "/kvkk"], ["Gizlilik Politikası", "/privacy"], ["Kullanım Şartları", "/terms"]]} />
         <FooterColumn title="Destek" links={[["SSS", "#sss"], ["İletişim", "#iletisim"], ["Demo Talep Et", "/demo-request"], ["Giriş Yap", "/login"]]} />
         <FooterColumn title="Hakkımızda" links={[["MSGNEX Hakkında", "#nasil-calisir"], ["Beta Programı", "/demo-request"], ["Güvenli Altyapı", "#guvenlik"]]} />
