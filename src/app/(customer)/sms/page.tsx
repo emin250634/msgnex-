@@ -14,6 +14,13 @@ import type { Contact, Group, SmsTemplate } from "@/types"
 const NO_SEGMENT = "__none__"
 const ALL_CONTACTS = "__all__"
 
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "")
+  if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`
+  if (digits.length === 10) return `90${digits}`
+  return digits
+}
+
 export default function SmsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [groups, setGroups] = useState<Group[]>([])
@@ -31,12 +38,16 @@ export default function SmsPage() {
   const [providerStatus, setProviderStatus] = useState("Kurulum bekliyor")
   const [confirmAllContacts, setConfirmAllContacts] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
+  const [suppressionPhones, setSuppressionPhones] = useState<string[]>([])
 
   useEffect(() => {
     const sb = createClient()
     sb.from("contacts").select("*").then(({ data }) => setContacts(data ?? []))
     sb.from("groups").select("*").then(({ data }) => setGroups(data ?? []))
     sb.from("sms_templates").select("*").order("name").then(({ data }) => setTemplates(data ?? []))
+    sb.from("suppression_list").select("phone").then(({ data }) => {
+      setSuppressionPhones((data ?? []).map((entry) => normalizePhone(String(entry.phone))).filter(Boolean))
+    })
     sb.from("profiles").select("company_id").maybeSingle().then(async ({ data: profile }) => {
       if (profile?.company_id) {
         const { data: providerData } = await sb.rpc("get_customer_provider_status")
@@ -54,7 +65,7 @@ export default function SmsPage() {
     .map((number) => number.trim())
     .filter(Boolean), [manualNumbers])
 
-  const getRecipients = useCallback((): string[] => {
+  const selectedRecipients = useMemo(() => {
     const groupRecipients =
       selectedGroup === ALL_CONTACTS
         ? contacts.map((contact) => contact.phone)
@@ -62,12 +73,24 @@ export default function SmsPage() {
           ? contacts.filter((contact) => contact.group_id === selectedGroup).map((contact) => contact.phone)
           : []
 
-    return Array.from(new Set([...groupRecipients, ...manualRecipients]))
+    return Array.from(new Set([...groupRecipients, ...manualRecipients].map(normalizePhone).filter(Boolean)))
   }, [contacts, manualRecipients, selectedGroup])
 
-  const recipientCount = getRecipients().length
+  const suppressionSet = useMemo(() => new Set(suppressionPhones), [suppressionPhones])
+  const suppressedRecipients = useMemo(
+    () => selectedRecipients.filter((recipient) => suppressionSet.has(recipient)),
+    [selectedRecipients, suppressionSet]
+  )
+  const sendableRecipients = useMemo(
+    () => selectedRecipients.filter((recipient) => !suppressionSet.has(recipient)),
+    [selectedRecipients, suppressionSet]
+  )
+
+  const recipientCount = selectedRecipients.length
+  const sendableRecipientCount = sendableRecipients.length
+  const suppressedRecipientCount = suppressedRecipients.length
   const segmentInfo = calculateSmsSegments(message)
-  const cost = recipientCount * segmentInfo.segments
+  const cost = sendableRecipientCount * segmentInfo.segments
   const selectedGroupName = selectedGroup === ALL_CONTACTS
     ? "Tüm Kişiler"
     : selectedGroup === NO_SEGMENT
@@ -75,7 +98,7 @@ export default function SmsPage() {
       : groups.find((group) => group.id === selectedGroup)?.name || "Seçili segment"
   const hasAudience = selectedGroup !== NO_SEGMENT || manualRecipients.length > 0
   const requiresAllContactsApproval = selectedGroup === ALL_CONTACTS
-  const canPrepareSend = Boolean(message.trim()) && hasAudience && recipientCount > 0 && providerReady && (!requiresAllContactsApproval || confirmAllContacts)
+  const canPrepareSend = Boolean(message.trim()) && hasAudience && sendableRecipientCount > 0 && providerReady && (!requiresAllContactsApproval || confirmAllContacts)
 
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplate(id)
@@ -128,6 +151,10 @@ export default function SmsPage() {
       toast.error("Devam etmek için segment seçin veya manuel numara girin")
       return
     }
+    if (sendableRecipientCount === 0) {
+      toast.error("Seçilen alıcıların tamamı kara listede")
+      return
+    }
     if (requiresAllContactsApproval && !confirmAllContacts) {
       toast.error("Tüm kişilere gönderim için ek onayı işaretleyin")
       return
@@ -143,7 +170,7 @@ export default function SmsPage() {
     setLoading(true)
     setQueuedCampaignId(null)
 
-    const recipients = getRecipients()
+    const recipients = selectedRecipients
     if (recipients.length === 0) {
       toast.error("Gönderilecek kişi bulunamadı. Segment seçin veya numara girin.")
       setLoading(false)
@@ -321,12 +348,18 @@ export default function SmsPage() {
       </Card>
 
       <Card title="Gönderim Öncesi Özet">
-        <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-5">
-          <SummaryItem label="Alıcı sayısı" value={recipientCount.toString()} />
+        <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-6">
+          <SummaryItem label="Seçilen alıcı" value={recipientCount.toString()} />
+          <SummaryItem label="Gönderilecek" value={sendableRecipientCount.toString()} />
+          <SummaryItem label="Kara listede atlanacak" value={suppressedRecipientCount.toString()} emphasize={suppressedRecipientCount > 0} />
           <SummaryItem label="Tahmini sağlayıcı kredi kullanımı" value={`${cost} SMS parçası`} />
           <SummaryItem label="Segment / kaynak" value={selectedGroupName} />
-          <SummaryItem label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" />
           <SummaryItem label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
+        </div>
+        <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+          <RiskCheck label="Provider başlığı" value={senderId || "Tanımlı değil"} ok={providerReady && Boolean(senderId)} />
+          <RiskCheck label="Kara liste kontrolü" value={suppressedRecipientCount > 0 ? `${suppressedRecipientCount} numara atlanacak` : "Atlanacak numara yok"} ok />
+          <RiskCheck label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" ok />
         </div>
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <p className="text-xs font-semibold uppercase text-gray-500">Mesaj önizleme</p>
@@ -338,12 +371,16 @@ export default function SmsPage() {
         <Card title="Son Onay">
           <div className="space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-              <p className="text-lg font-semibold text-blue-950">{recipientCount} kişiye SMS gönderilecek</p>
-              <p className="mt-1">Tahmini {cost} SMS parçası firmanızın sağlayıcı hesabındaki krediden kullanılacak. Kampanya kuyruğa alınır.</p>
+              <p className="text-lg font-semibold text-blue-950">{sendableRecipientCount} kişiye SMS gönderilecek</p>
+              <p className="mt-1">
+                Tahmini {cost} SMS parçası firmanızın sağlayıcı hesabındaki krediden kullanılacak.
+                {suppressedRecipientCount > 0 ? ` ${suppressedRecipientCount} kara listedeki numara gönderimden çıkarılacak.` : ""}
+                {" "}Kampanya kuyruğa alınır.
+              </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={handleSend} disabled={loading}>
-                {loading ? "Gönderiliyor..." : `${recipientCount} Kişiye SMS Gönder`}
+                {loading ? "Gönderiliyor..." : `${sendableRecipientCount} Kişiye SMS Gönder`}
               </Button>
               <Button variant="secondary" onClick={() => setShowFinalConfirm(false)} disabled={loading}>Geri Dön</Button>
             </div>
@@ -371,6 +408,15 @@ function SummaryItem({ label, value, emphasize = false }: { label: string; value
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
       <p className={emphasize ? "mt-2 text-lg font-semibold text-red-700" : "mt-2 text-lg font-semibold text-gray-950"}>{value}</p>
+    </div>
+  )
+}
+
+function RiskCheck({ label, value, ok }: { label: string; value: string; ok: boolean }) {
+  return (
+    <div className={ok ? "rounded-xl border border-emerald-200 bg-emerald-50 p-4" : "rounded-xl border border-amber-200 bg-amber-50 p-4"}>
+      <p className={ok ? "text-xs font-semibold uppercase text-emerald-700" : "text-xs font-semibold uppercase text-amber-700"}>{label}</p>
+      <p className={ok ? "mt-2 text-sm font-semibold text-emerald-950" : "mt-2 text-sm font-semibold text-amber-950"}>{value}</p>
     </div>
   )
 }

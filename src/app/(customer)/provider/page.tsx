@@ -59,6 +59,33 @@ export default function ProviderPage() {
   if (loading) return <p>Yükleniyor...</p>
 
   const providerReady = Boolean(status?.has_provider && status.sender_header && status.connection_status !== "disabled")
+  const setupSteps = [
+    {
+      label: "Firmanız adına Netgsm hesabı açılır",
+      done: Boolean(status?.has_provider),
+      detail: "SMS bakiyesi, sözleşme ve başlık sağlayıcı tarafında yönetilir.",
+    },
+    {
+      label: "API kullanıcı bilgileri admin tarafından tanımlanır",
+      done: Boolean(status?.has_provider),
+      detail: "Secret bilgisi panelde gösterilmez; yalnızca güvenli bağlantı için saklanır.",
+    },
+    {
+      label: "Sağlayıcıdan onaylı başlıklar sorgulanır",
+      done: Boolean(status?.sender_header),
+      detail: "Manuel başlık girilemez, sadece sağlayıcıdan dönen başlık kullanılır.",
+    },
+    {
+      label: "Bağlantı ve kredi durumu kontrol edilir",
+      done: status?.connection_status === "connected",
+      detail: "Kredi yenileme MSGNEX'ten değil, firmanızın sağlayıcı hesabından yapılır.",
+    },
+    {
+      label: "Gönderim ekranı kullanıma açılır",
+      done: providerReady,
+      detail: "Kampanyalar onaylı başlık ve firma sağlayıcı hesabı üzerinden kuyruğa alınır.",
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -111,6 +138,20 @@ export default function ProviderPage() {
         </div>
       </Card>
 
+      <Card title="Kurulum Akışı">
+        <div className="space-y-3">
+          {setupSteps.map((step, index) => (
+            <SetupStep
+              key={step.label}
+              index={index + 1}
+              label={step.label}
+              detail={step.detail}
+              done={step.done}
+            />
+          ))}
+        </div>
+      </Card>
+
       {!providerReady && (
         <Card>
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
@@ -120,11 +161,29 @@ export default function ProviderPage() {
         </Card>
       )}
 
-      <Card title="Sonraki Adım">
-        <p className="text-sm leading-6 text-gray-600">
-          Provider bağlantınız hazır olduğunda kampanyalarınızı <Link href="/sms" className="font-semibold text-blue-700 hover:text-blue-800">SMS Gönder</Link> ekranından kuyruğa alabilirsiniz.
-          Gönderim sorumluluğu, alıcı izinleri ve ticari elektronik ileti uygunluğu firmanıza aittir.
-        </p>
+      <Card title={providerReady ? "Sıradaki İşlem" : "Hazırlamanız Gerekenler"}>
+        {providerReady ? (
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-gray-600">
+              Provider bağlantınız hazır. Kampanya oluşturmadan önce kişi listenizi ve kara liste kayıtlarınızı kontrol edin.
+              Gönderim sorumluluğu, alıcı izinleri ve ticari elektronik ileti uygunluğu firmanıza aittir.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/sms" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                SMS Gönder
+              </Link>
+              <Link href="/suppression" className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                Kara Listeyi Kontrol Et
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 text-sm md:grid-cols-3">
+            <PreparationItem title="Netgsm hesabı" text="Hesap firmanız adına açılmış olmalı." />
+            <PreparationItem title="Onaylı başlık" text="Gönderici başlığı sağlayıcı tarafında tanımlı olmalı." />
+            <PreparationItem title="API bilgileri" text="Usercode ve secret admin tarafından güvenli şekilde bağlanmalı." />
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -135,6 +194,32 @@ function CheckRow({ label, done }: { label: string; done: boolean }) {
     <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-100 p-3">
       <span className="font-medium text-gray-800">{label}</span>
       <StatusBadge label={done ? "Tamam" : "Bekliyor"} tone={done ? "success" : "warning"} />
+    </div>
+  )
+}
+
+function SetupStep({ index, label, detail, done }: { index: number; label: string; detail: string; done: boolean }) {
+  return (
+    <div className="flex gap-4 rounded-xl border border-gray-100 p-4">
+      <div className={done ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700" : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-700"}>
+        {done ? "✓" : index}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-semibold text-gray-950">{label}</p>
+          <StatusBadge label={done ? "Tamam" : "Bekliyor"} tone={done ? "success" : "warning"} />
+        </div>
+        <p className="mt-1 text-sm leading-6 text-gray-500">{detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function PreparationItem({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <p className="font-semibold text-gray-950">{title}</p>
+      <p className="mt-2 leading-6 text-gray-600">{text}</p>
     </div>
   )
 }
