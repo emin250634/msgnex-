@@ -65,8 +65,8 @@ export default function Home() {
               Kontrollü Beta Programı
             </div>
             <h1 className="mt-7 text-4xl font-semibold leading-[1.08] sm:text-5xl lg:text-[3.55rem]">
-              SMS sağlayıcınızı değiştirmeden
-              <span className="mt-2 block text-blue-300">iletişim operasyonunuzu yönetin</span>
+              SMS hesabınız sizde kalsın
+              <span className="mt-2 block text-blue-300">operasyon MSGNEX ile büyüsün</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
               MSGNEX, SMS satın alma ve gönderim operasyonunu birbirinden ayırır. Firmanızın kendi yetkili SMS sağlayıcı hesabını güvenli şekilde bağlar; kişi, kampanya, API, webhook, raporlama ve denetim süreçlerini tek panelde toplar.
