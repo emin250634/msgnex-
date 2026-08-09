@@ -9,7 +9,7 @@ const capabilities = [
 ]
 
 const trustItems = [
-  ["SMS bakiyesi satışı yok", "Sağlayıcı hesabınız kullanılır"],
+  ["Kendi SMS bakiyenizi kullanın", "Mevcut hesabınızla ilerleyin"],
   ["Onaylı başlık", "Marka taklidi engellenir"],
   ["Kurulum checklist", "Pilot başlangıç netleşir"],
   ["Audit ve uyarılar", "Operasyon izlenebilir"],
@@ -23,7 +23,7 @@ const steps = [
 ]
 
 const differentiators = [
-  ["SMS bakiyesi satmayız", "MSGNEX'in işi bakiye veya başlık satmak değil; firmanızın kendi sağlayıcı hesabını daha düzenli ve ölçülebilir kullanmasını sağlamaktır."],
+  ["Mevcut SMS hesabınızı kullanmaya devam edin", "MSGNEX; kişi yönetimi, kampanyalar, API, raporlama ve kullanıcı yetkilendirmesini tek platformda bir araya getirir."],
   ["Başlık sağlayıcıdan gelir", "Firma panelde farklı marka adı yazamaz. Gönderimler sadece sağlayıcı hesabında tanımlı başlıkla hazırlanır."],
   ["Pilot süreci takip edilir", "Müşteri kurulum ekranı ve admin onboarding takibiyle sağlayıcı, kişi listesi ve ilk test kampanyası kontrol altında ilerler."],
 ]
@@ -42,7 +42,7 @@ const providerFlow = [
 ]
 
 const faqs = [
-  ["MSGNEX SMS bakiyesi satar mı?", "Hayır. SMS bakiyesi ve fiyatlandırma yetkili SMS sağlayıcısı tarafında yönetilir. MSGNEX bu hesabı operasyon paneline bağlar."],
+  ["SMS bakiyemi nasıl kullanırım?", "Mevcut SMS hesabınızı kullanmaya devam edersiniz. MSGNEX, sağlayıcı hesabınızı merkezi kampanya, raporlama, API ve yetki yönetimi süreçlerine bağlar."],
   ["Hangi SMS sağlayıcısını kullanabilirim?", "Firma ihtiyacına göre farklı yetkili sağlayıcılar değerlendirilebilir. Her sağlayıcının API yapısı farklı olabileceği için entegrasyon durumu ayrıca planlanır."],
   ["Gönderici başlığını panelden değiştirebilir miyim?", "Hayır. Gönderimler yalnızca sağlayıcı hesabınızda onaylı görünen başlıkla hazırlanır. Bu sayede farklı marka adıyla gönderim riski azaltılır."],
   ["Müşterilerim bu panelde ne yapar?", "Kişi listelerini, segmentleri, şablonları, kampanyaları, gönderim sonuçlarını, API anahtarlarını, webhook ayarlarını ve bildirimleri yönetir."],
@@ -65,11 +65,11 @@ export default function Home() {
               Kontrollü Beta Programı
             </div>
             <h1 className="mt-7 text-4xl font-semibold leading-[1.08] sm:text-5xl lg:text-[3.55rem]">
-              SMS hesabınız sizde kalsın
-              <span className="mt-2 block text-blue-300">operasyon MSGNEX ile büyüsün</span>
+              SMS operasyonunuzun kontrolü
+              <span className="mt-2 block text-blue-300">tek panelde</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              MSGNEX, SMS satın alma ve gönderim operasyonunu birbirinden ayırır. Firmanızın kendi yetkili SMS sağlayıcı hesabını güvenli şekilde bağlar; kişi, kampanya, API, webhook, raporlama ve denetim süreçlerini tek panelde toplar.
+              Kişilerinizi, kampanyalarınızı, gönderimlerinizi ve raporlarınızı tek merkezden yönetin. MSGNEX, mevcut SMS sağlayıcınızla çalışarak kurumunuza merkezi ve güvenli bir operasyon altyapısı sunar.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/demo-request" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-7 py-4 text-base font-semibold text-white shadow-xl shadow-blue-950/40 transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-2xl">
@@ -81,7 +81,7 @@ export default function Home() {
               </a>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-7 gap-y-4 border-t border-white/15 pt-7 text-sm font-medium text-slate-200">
-              {["Kendi sağlayıcı hesabınız", "Onaylı gönderici başlığı", "Bakiye satışı yok", "Audit log ve bildirim merkezi"].map((item) => (
+              {["Kendi SMS sağlayıcınız", "Merkezi kampanya yönetimi", "Detaylı gönderim raporları", "Rol ve yetki kontrolü"].map((item) => (
                 <span key={item} className="flex items-center gap-2.5"><span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-400/10 text-xs text-emerald-300">✓</span>{item}</span>
               ))}
             </div>
