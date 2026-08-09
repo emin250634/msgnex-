@@ -39,8 +39,6 @@ export default function SmsPage() {
     sb.from("sms_templates").select("*").order("name").then(({ data }) => setTemplates(data ?? []))
     sb.from("profiles").select("company_id").maybeSingle().then(async ({ data: profile }) => {
       if (profile?.company_id) {
-        const { data: company } = await sb.from("companies").select("sender_name, sender_approved").eq("id", profile.company_id).single()
-        if (company?.sender_name) setSenderId(company.sender_name)
         const { data: providerData } = await sb.rpc("get_customer_provider_status")
         const provider = providerData?.[0]
         if (provider?.sender_header) setSenderId(provider.sender_header)
@@ -270,7 +268,7 @@ export default function SmsPage() {
       <Card title="Mesaj">
         <div className="space-y-4">
           <div>
-            <p className="mb-1 text-sm font-medium text-gray-700">Gönderici Adı (SMS Başlığı)</p>
+            <p className="mb-1 text-sm font-medium text-gray-700">Sağlayıcı SMS Başlığı</p>
             <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
               <span className="font-mono text-sm font-medium text-gray-900">
                 {senderId || "Henüz tanımlanmadı"}
@@ -279,7 +277,7 @@ export default function SmsPage() {
             </div>
             {!providerReady && (
               <p className="mt-1 text-xs text-amber-600">
-                SMS gönderebilmek için firmanızın Netgsm provider bağlantısı hazır olmalıdır.
+                SMS gönderebilmek için firmanızın Netgsm provider bağlantısı ve onaylı başlığı hazır olmalıdır.
               </p>
             )}
           </div>
@@ -325,7 +323,7 @@ export default function SmsPage() {
       <Card title="Gönderim Öncesi Özet">
         <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-5">
           <SummaryItem label="Alıcı sayısı" value={recipientCount.toString()} />
-          <SummaryItem label="Tahmini provider kullanımı" value={`${cost} SMS parçası`} />
+          <SummaryItem label="Tahmini sağlayıcı kredi kullanımı" value={`${cost} SMS parçası`} />
           <SummaryItem label="Segment / kaynak" value={selectedGroupName} />
           <SummaryItem label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" />
           <SummaryItem label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
@@ -341,7 +339,7 @@ export default function SmsPage() {
           <div className="space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
               <p className="text-lg font-semibold text-blue-950">{recipientCount} kişiye SMS gönderilecek</p>
-              <p className="mt-1">Tahmini {cost} SMS parçası provider hesabınız üzerinden kullanılacak. Kampanya kuyruğa alınır.</p>
+              <p className="mt-1">Tahmini {cost} SMS parçası firmanızın sağlayıcı hesabındaki krediden kullanılacak. Kampanya kuyruğa alınır.</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={handleSend} disabled={loading}>

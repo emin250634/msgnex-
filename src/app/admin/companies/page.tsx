@@ -14,9 +14,9 @@ import type { Company } from "@/types"
 
 const companyStatuses = [
   { value: "pending_provider_setup", label: "Provider Bekliyor" },
-  { value: "pending_review", label: "İnceleme Bekliyor" },
+  { value: "pending_review", label: "Inceleme Bekliyor" },
   { value: "active", label: "Aktif" },
-  { value: "suspended", label: "Askıda" },
+  { value: "suspended", label: "Askida" },
   { value: "rejected", label: "Reddedildi" },
 ]
 
@@ -35,6 +35,7 @@ export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     companyName: "",
     ownerName: "",
@@ -56,7 +57,7 @@ export default function CompaniesPage() {
 
   const handleCreate = async () => {
     if (!form.companyName.trim() || !form.ownerName.trim() || !form.ownerEmail.trim()) {
-      toast.error("Firma adı, yetkili adı ve yetkili e-posta zorunludur")
+      toast.error("Firma adi, yetkili adi ve yetkili e-posta zorunludur")
       return
     }
 
@@ -72,11 +73,11 @@ export default function CompaniesPage() {
         status: form.status,
       }),
     })
-    const payload = await response.json().catch(() => ({ error: "Firma oluşturulamadı" }))
+    const payload = await response.json().catch(() => ({ error: "Firma olusturulamadi" }))
     setSaving(false)
 
     if (!response.ok) {
-      toast.error(payload.error || "Firma oluşturulamadı")
+      toast.error(payload.error || "Firma olusturulamadi")
       return
     }
 
@@ -87,29 +88,49 @@ export default function CompaniesPage() {
       phone: "",
       status: "pending_provider_setup",
     })
-    toast.success("Firma oluşturuldu ve owner daveti gönderildi")
+    toast.success("Firma olusturuldu ve owner daveti gonderildi")
     load()
   }
 
-  if (loading) return <p>Yükleniyor...</p>
+  const handleDelete = async (company: Company) => {
+    const confirmed = window.confirm(
+      `${company.name} firmasini kalici olarak silmek istiyor musunuz? Firmaya bagli veriler ve baska firmaya bagli olmayan firma kullanicilari da silinir.`
+    )
+    if (!confirmed) return
+
+    setDeletingId(company.id)
+    const response = await fetch(`/api/admin/companies/${company.id}`, { method: "DELETE" })
+    const payload = await response.json().catch(() => ({ error: "Firma silinemedi" }))
+    setDeletingId(null)
+
+    if (!response.ok) {
+      toast.error(payload.error || "Firma silinemedi")
+      return
+    }
+
+    toast.success("Firma kalici olarak silindi")
+    load()
+  }
+
+  if (loading) return <p>Yukleniyor...</p>
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Firma Yönetimi"
-        description="Firmaları oluşturun, ilk firma yetkilisini davet edin ve müşteri hesaplarını yönetin."
+        title="Firma Yonetimi"
+        description="Firmalari olusturun, ilk firma yetkilisini davet edin ve musteri hesaplarini yonetin."
       />
 
       <Card title="Yeni Firma ve Owner Daveti">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <Input
-            label="Firma adı"
-            placeholder="Firma adı"
+            label="Firma adi"
+            placeholder="Firma adi"
             value={form.companyName}
             onChange={(event) => setForm({ ...form, companyName: event.target.value })}
           />
           <Input
-            label="Yetkili adı"
+            label="Yetkili adi"
             placeholder="Ad soyad"
             value={form.ownerName}
             onChange={(event) => setForm({ ...form, ownerName: event.target.value })}
@@ -141,7 +162,7 @@ export default function CompaniesPage() {
           </div>
         </div>
         <Button className="mt-4" onClick={handleCreate} disabled={saving}>
-          {saving ? "Oluşturuluyor..." : "Firma Oluştur ve Davet Gönder"}
+          {saving ? "Olusturuluyor..." : "Firma Olustur ve Davet Gonder"}
         </Button>
       </Card>
 
@@ -151,7 +172,6 @@ export default function CompaniesPage() {
             <Tr>
               <Th>Firma</Th>
               <Th>Telefon</Th>
-              <Th>SMS Başlığı</Th>
               <Th>Durum</Th>
               <Th>Aksiyon</Th>
             </Tr>
@@ -162,20 +182,25 @@ export default function CompaniesPage() {
                 <Td className="font-medium">{company.name}</Td>
                 <Td>{company.phone || "-"}</Td>
                 <Td>
-                  <span className="rounded bg-gray-100 px-2 py-0.5 font-mono text-sm">
-                    {company.sender_name || "Ayarlanmamış"}
-                  </span>
-                </Td>
-                <Td>
                   <StatusBadge
                     label={statusLabel(company.status, company.is_active)}
                     tone={statusTone(company.status, company.is_active)}
                   />
                 </Td>
                 <Td>
-                  <Link href={`/admin/companies/${company.id}`}>
-                    <Button variant="secondary" size="sm">Detay</Button>
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href={`/admin/companies/${company.id}`}>
+                      <Button variant="secondary" size="sm">Detay</Button>
+                    </Link>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={deletingId === company.id}
+                      onClick={() => handleDelete(company)}
+                    >
+                      {deletingId === company.id ? "Siliniyor..." : "Sil"}
+                    </Button>
+                  </div>
                 </Td>
               </Tr>
             ))}

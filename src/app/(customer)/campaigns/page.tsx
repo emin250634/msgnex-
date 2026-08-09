@@ -429,7 +429,7 @@ export default function CampaignsPage() {
                 <CancelMetric label="Etkilenecek kişi" value={`${cancelTarget.total_recipients} kişi`} />
                 <CancelMetric label="Atlanan kişi" value={`${cancelTarget.skipped_recipients ?? 0} kişi`} />
                 <CancelMetric label="Mesaj parçası" value={`${calculateSmsSegments(cancelTarget.message).segments} parça`} />
-                <CancelMetric label="Tahmini provider kullanımı" value={`${estimatedProviderUnits(cancelTarget)} SMS parçası`} />
+                <CancelMetric label="Tahmini sağlayıcı kredi kullanımı" value={`${estimatedProviderUnits(cancelTarget)} SMS parçası`} />
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">

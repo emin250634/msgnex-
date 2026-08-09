@@ -44,7 +44,7 @@ const customerNav: NavItem[] = [
   { label: "Otomasyon Kuyruğu", href: "/automation-queue", icon: "queue" },
   { label: "Şablonlar", href: "/templates", icon: "templates" },
   { label: "Kara Liste", href: "/suppression", icon: "suppression" },
-  { label: "Provider Bağlantısı", href: "/balance", icon: "provider" },
+  { label: "Provider Bağlantısı", href: "/provider", icon: "provider" },
   { label: "API Anahtarları", href: "/api-keys", icon: "api" },
 ]
 

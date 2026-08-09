@@ -39,6 +39,11 @@ interface ProviderSettingsResponse {
     sync_status: string
     last_sync_error: string | null
   } | null
+  sender_headers: Array<{
+    header: string
+    status: string
+    last_synced_at: string | null
+  }>
 }
 
 interface ProviderFormState {
@@ -137,6 +142,8 @@ export default function AdminCompanyDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [inviting, setInviting] = useState(false)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [providerAction, setProviderAction] = useState<"test_connection" | "query_headers" | "query_credit" | null>(null)
   const [error, setError] = useState("")
   const [inviteForm, setInviteForm] = useState({
     fullName: "",
@@ -186,6 +193,7 @@ export default function AdminCompanyDetailPage() {
 
   const settings = providerData?.provider_settings
   const wallet = providerData?.wallet
+  const senderHeaders = providerData?.sender_headers ?? []
   const hasProviderRecord = Boolean(settings?.created_at)
 
   const providerHealth = useMemo(() => {
@@ -204,7 +212,7 @@ export default function AdminCompanyDetailPage() {
     { label: settings?.encoding === "TEST" ? "Test provider seçili" : "Netgsm usercode kaydı", done: Boolean(settings?.usercode) },
     { label: settings?.encoding === "TEST" ? "Test secret kaydı" : "Encrypted secret kaydı", done: Boolean(settings?.has_secret) },
     { label: "Başlık bilgisi", done: Boolean(settings?.sender_header) },
-    { label: "Bakiye senkronizasyonu", done: Boolean(wallet?.last_synced_at) },
+    { label: "Sağlayıcı kredi sorgusu", done: Boolean(wallet?.last_synced_at) },
   ], [hasProviderRecord, settings?.encoding, settings?.has_secret, settings?.sender_header, settings?.usercode, wallet?.last_synced_at])
 
   const handleSave = async () => {
@@ -235,6 +243,33 @@ export default function AdminCompanyDetailPage() {
     setProviderData(nextData)
     setForm(formFromSettings(nextData))
     toast.success("Provider ayarları kaydedildi")
+  }
+
+  const runProviderAction = async (action: "test_connection" | "query_headers" | "query_credit") => {
+    setProviderAction(action)
+    const response = await fetch(`/api/admin/companies/${params.id}/provider-settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    })
+    const payload = await response.json().catch(() => ({ error: "Provider aksiyonu tamamlanamadı" }))
+    setProviderAction(null)
+
+    if (!response.ok) {
+      toast.error(payload.error || "Provider aksiyonu tamamlanamadı")
+      return
+    }
+
+    const nextData = payload as ProviderSettingsResponse & { result?: { ok?: boolean; message?: string } }
+    setProviderData(nextData)
+    setForm(formFromSettings(nextData))
+
+    if (nextData.result?.ok === false) {
+      toast.error(nextData.result.message || "Provider sorgusu hata verdi")
+      return
+    }
+
+    toast.success(nextData.result?.message || "Provider bilgisi güncellendi")
   }
 
   const handleInvite = async () => {
@@ -283,6 +318,26 @@ export default function AdminCompanyDetailPage() {
     load()
   }
 
+  const deleteCompanyUser = async (user: CompanyUserRow) => {
+    const confirmed = window.confirm(`${user.full_name || user.email} kullanicisini kalici olarak silmek istiyor musunuz?`)
+    if (!confirmed) return
+
+    setDeletingUserId(user.id)
+    const response = await fetch(`/api/admin/companies/${params.id}/users/${user.id}`, {
+      method: "DELETE",
+    })
+    const payload = await response.json().catch(() => ({ error: "Kullanici silinemedi" }))
+    setDeletingUserId(null)
+
+    if (!response.ok) {
+      toast.error(payload.error || "Kullanici silinemedi")
+      return
+    }
+
+    toast.success("Kullanici kalici olarak silindi")
+    load()
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -326,7 +381,7 @@ export default function AdminCompanyDetailPage() {
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Sağlayıcı" value={settings?.encoding === "TEST" ? "Test Provider" : hasProviderRecord ? "Netgsm" : "Henüz bağlanmadı"} description="Firma bazlı provider" tone="slate" icon={<span className="font-semibold">NG</span>} />
         <StatCard title="Bağlantı" value={connectionLabel(settings?.connection_status)} description="Test bağlantısı bu fazda yok" tone={settings?.connection_status === "connected" ? "emerald" : "amber"} icon={<span className="font-semibold">API</span>} />
-        <StatCard title="Netgsm Bakiyesi" value={wallet ? wallet.balance.toLocaleString("tr-TR") : "-"} description={wallet ? `${wallet.balance_unit || "sms"} / ${wallet.currency || "TRY"}` : "Sync yok"} tone="slate" icon={<span className="font-semibold">₺</span>} />
+        <StatCard title="Netgsm Kredi Durumu" value={wallet ? wallet.balance.toLocaleString("tr-TR") : "-"} description={wallet ? `${wallet.balance_unit || "sms"} / ${wallet.currency || "TRY"}` : "Henüz sorgulanmadı"} tone="slate" icon={<span className="font-semibold">₺</span>} />
         <StatCard title="Provider Sağlığı" value={providerHealth.label} description="Connected test yapılmadan hazır sayılmaz" tone={providerHealth.tone === "success" ? "emerald" : "amber"} icon={<span className="font-semibold">ST</span>} />
       </div>
 
@@ -343,9 +398,27 @@ export default function AdminCompanyDetailPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" disabled>Test Bağlantısı</Button>
-            <Button variant="secondary" disabled>Başlıkları Sorgula</Button>
-            <Button variant="secondary" disabled>Bakiye Yenile</Button>
+            <Button
+              variant="secondary"
+              disabled={Boolean(providerAction) || !settings?.has_secret}
+              onClick={() => runProviderAction("test_connection")}
+            >
+              {providerAction === "test_connection" ? "Test ediliyor..." : "Test Bağlantısı"}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={Boolean(providerAction) || !settings?.has_secret}
+              onClick={() => runProviderAction("query_headers")}
+            >
+              {providerAction === "query_headers" ? "Sorgulanıyor..." : "Başlıkları Sorgula"}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={Boolean(providerAction) || !settings?.has_secret}
+              onClick={() => runProviderAction("query_credit")}
+            >
+              {providerAction === "query_credit" ? "Sorgulanıyor..." : "Sağlayıcıdan Kredi Sorgula"}
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Kaydediliyor..." : "Kaydet"}
             </Button>
@@ -369,17 +442,16 @@ export default function AdminCompanyDetailPage() {
               value={form.secret}
               onChange={(value) => setForm((state) => ({ ...state, secret: value }))}
             />
-            <EditableField
-              label="Sender Header"
+            <SenderHeaderSelect
               value={form.senderHeader}
-              placeholder={form.isTestMode ? "Örn: MSGNEX" : "Henüz girilmedi"}
-              maxLength={11}
-              onChange={(value) => setForm((state) => ({ ...state, senderHeader: value.toUpperCase() }))}
+              headers={senderHeaders}
+              isTestMode={form.isTestMode}
+              onChange={(value) => setForm((state) => ({ ...state, senderHeader: value }))}
             />
             <Field label="Başlık Durumu" badge={<StatusBadge label={headerStatusLabel(settings?.sender_header_status)} tone={statusTone(settings?.sender_header_status)} />} />
             <Field label="Son Bağlantı Testi" value="Yok" />
-            <Field label="Son Bakiye Sync" value={formatDate(wallet?.last_synced_at)} />
-            <Field label="Güncel Bakiye" value={wallet ? `${wallet.balance.toLocaleString("tr-TR")} ${wallet.balance_unit || "sms"} ${wallet.currency || ""}` : "-"} />
+            <Field label="Son Sağlayıcı Sorgusu" value={formatDate(wallet?.last_synced_at)} />
+            <Field label="Sağlayıcıdaki Kredi" value={wallet ? `${wallet.balance.toLocaleString("tr-TR")} ${wallet.balance_unit || "sms"} ${wallet.currency || ""}` : "-"} />
             <Field label="Son Hata" value={settings?.connection_status === "error" ? "Provider bağlantısı hatalı" : "Yok"} muted={settings?.connection_status !== "error"} />
             <EditableField
               label="Encoding"
@@ -420,7 +492,7 @@ export default function AdminCompanyDetailPage() {
                       isTestMode: enabled,
                       isActive: enabled ? true : state.isActive,
                       usercode: enabled ? "MSGNEX_TEST" : state.usercode === "MSGNEX_TEST" ? "" : state.usercode,
-                      senderHeader: enabled && !state.senderHeader ? "MSGNEX" : state.senderHeader,
+                      senderHeader: enabled ? state.senderHeader || "MSGNEX" : state.senderHeader === "MSGNEX" ? "" : state.senderHeader,
                       encoding: enabled ? "TEST" : "TR",
                     }))
                   }}
@@ -450,13 +522,13 @@ export default function AdminCompanyDetailPage() {
             </div>
 
             <div className="rounded-2xl border border-gray-100 bg-gray-50 p-5">
-              <p className="text-sm font-semibold text-gray-950">Wallet</p>
+              <p className="text-sm font-semibold text-gray-950">Sağlayıcı Kredi Durumu</p>
               <div className="mt-4 space-y-3 text-sm">
-                <InfoRow label="Bakiye" value={wallet ? `${wallet.balance.toLocaleString("tr-TR")} ${wallet.balance_unit || "sms"}` : "-"} />
+                <InfoRow label="Sağlayıcıdaki Kredi" value={wallet ? `${wallet.balance.toLocaleString("tr-TR")} ${wallet.balance_unit || "sms"}` : "-"} />
                 <InfoRow label="Para Birimi" value={wallet?.currency || "-"} />
-                <InfoRow label="Sync Durumu" value={syncStatusLabel(wallet?.sync_status)} />
-                <InfoRow label="Son Sync" value={formatDate(wallet?.last_synced_at)} />
-                <InfoRow label="Sync Hatası" value={wallet?.last_sync_error || "Yok"} />
+                <InfoRow label="Sorgu Durumu" value={syncStatusLabel(wallet?.sync_status)} />
+                <InfoRow label="Son Sorgu" value={formatDate(wallet?.last_synced_at)} />
+                <InfoRow label="Sorgu Hatası" value={wallet?.last_sync_error || "Yok"} />
               </div>
             </div>
           </aside>
@@ -546,6 +618,15 @@ export default function AdminCompanyDetailPage() {
                       >
                         {user.is_active ? "Pasifleştir" : "Aktifleştir"}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        className="ml-2"
+                        disabled={deletingUserId === user.id}
+                        onClick={() => deleteCompanyUser(user)}
+                      >
+                        {deletingUserId === user.id ? "Siliniyor..." : "Sil"}
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -616,6 +697,46 @@ function EditableField({
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
+    </div>
+  )
+}
+
+function SenderHeaderSelect({
+  value,
+  headers,
+  isTestMode,
+  onChange,
+}: {
+  value: string
+  headers: Array<{ header: string; status: string }>
+  isTestMode: boolean
+  onChange: (value: string) => void
+}) {
+  const approvedHeaders = headers.filter((item) => item.status === "approved")
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sender Header</p>
+      {isTestMode ? (
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm font-semibold text-gray-900">
+          {value || "MSGNEX"}
+        </div>
+      ) : (
+        <select
+          value={value}
+          disabled={approvedHeaders.length === 0}
+          onChange={(event) => onChange(event.target.value)}
+          className="mt-3 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+        >
+          <option value="">Sağlayıcıdan sorgulanan başlık seçin</option>
+          {approvedHeaders.map((item) => (
+            <option key={item.header} value={item.header}>{item.header}</option>
+          ))}
+        </select>
+      )}
+      <p className="mt-2 text-xs leading-5 text-gray-500">
+        Başlık manuel girilemez. Netgsm hesabında onaylı görünen başlıklar arasından seçim yapılır.
+      </p>
     </div>
   )
 }

@@ -43,7 +43,7 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
         phone: String(demo.phone || "").trim() || null,
         status: "pending_provider_setup",
         is_active: true,
-        sender_name: String(demo.company_name).trim().slice(0, 11),
+        sender_name: "",
         sender_approved: false,
       }).select("id").single()
       if (companyError || !company) throw new Error(companyError?.message || "Firma oluşturulamadı.")

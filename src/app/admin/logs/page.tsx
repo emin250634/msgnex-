@@ -75,7 +75,7 @@ export default function LogsPage() {
               <Th>Alıcı</Th>
               <Th>Mesaj</Th>
               <Th>Durum</Th>
-              <Th>SMS Parçası</Th>
+              <Th>Provider Birimi</Th>
               <Th>Tarih</Th>
             </Tr>
           </THead>

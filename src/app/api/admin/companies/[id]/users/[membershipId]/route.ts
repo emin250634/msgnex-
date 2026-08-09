@@ -88,3 +88,92 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     )
   }
 }
+
+export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+  try {
+    const auth = await requireAdminAuth()
+    if (!auth.ok) return auth.response
+
+    const { adminClient } = auth.context
+    const { data: membership, error: membershipError } = await adminClient
+      .from("company_users")
+      .select("*")
+      .eq("id", params.membershipId)
+      .eq("company_id", params.id)
+      .maybeSingle()
+
+    if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
+    if (!membership) return NextResponse.json({ error: "Company user not found" }, { status: 404 })
+
+    if (membership.role === "company_owner") {
+      const { count } = await adminClient
+        .from("company_users")
+        .select("*", { count: "exact", head: true })
+        .eq("company_id", params.id)
+        .eq("role", "company_owner")
+        .eq("is_active", true)
+
+      if ((count ?? 0) <= 1) {
+        return validationError("Son aktif owner silinemez")
+      }
+    }
+
+    const { error: deleteMembershipError } = await adminClient
+      .from("company_users")
+      .delete()
+      .eq("id", membership.id)
+
+    if (deleteMembershipError) {
+      return NextResponse.json({ error: deleteMembershipError.message }, { status: 500 })
+    }
+
+    await adminClient
+      .from("company_invitations")
+      .delete()
+      .eq("company_id", params.id)
+      .eq("user_id", membership.user_id)
+
+    const { count: remainingCount } = await adminClient
+      .from("company_users")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", membership.user_id)
+
+    if ((remainingCount ?? 0) === 0) {
+      const { data: profile } = await adminClient
+        .from("profiles")
+        .select("role")
+        .eq("id", membership.user_id)
+        .maybeSingle()
+
+      if (profile?.role !== "admin") {
+        const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(membership.user_id, false)
+        if (deleteUserError) return NextResponse.json({ error: deleteUserError.message }, { status: 500 })
+      }
+    } else {
+      const { data: nextMemberships } = await adminClient
+        .from("company_users")
+        .select("company_id, role, is_active")
+        .eq("user_id", membership.user_id)
+        .limit(1)
+
+      const nextMembership = nextMemberships?.[0]
+      if (nextMembership) {
+        await adminClient
+          .from("profiles")
+          .update({
+            company_id: nextMembership.company_id,
+            role: nextMembership.role,
+            is_active: nextMembership.is_active,
+          })
+          .eq("id", membership.user_id)
+      }
+    }
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { status: 500 }
+    )
+  }
+}

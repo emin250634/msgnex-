@@ -215,7 +215,7 @@ export default async function CustomerDashboard() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {!providerReady && (
-          <Link href="/balance" className="rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
+          <Link href="/provider" className="rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
             <p className="text-sm font-semibold text-amber-900">Provider kurulumu bekliyor</p>
             <p className="mt-1 text-sm text-amber-800">SMS gönderimi için firmanızın Netgsm bağlantısı tamamlanmalıdır.</p>
           </Link>
@@ -328,7 +328,7 @@ export default async function CustomerDashboard() {
             <QuickAction href="/groups" label="Grup Oluştur" icon="●" />
             <QuickAction href="/templates" label="Şablon Oluştur" icon="✎" />
             <QuickAction href="/campaigns" label="Kampanyalar" icon="▤" />
-            <QuickAction href="/balance" label="Provider Bağlantısı" icon="API" />
+            <QuickAction href="/provider" label="Provider Bağlantısı" icon="API" />
           </div>
         </Card>
       </div>

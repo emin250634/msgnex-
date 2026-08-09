@@ -24,6 +24,31 @@ export interface SendSmsResult {
   rawStatus?: unknown
 }
 
+export interface ProviderConnectionResult {
+  ok: boolean
+  statusCode: string
+  message: string
+  rawResponse?: unknown
+}
+
+export interface ProviderSenderHeadersResult {
+  ok: boolean
+  headers: string[]
+  statusCode: string
+  message: string
+  rawResponse?: unknown
+}
+
+export interface ProviderCreditStatusResult {
+  ok: boolean
+  amount: number | null
+  unit: string
+  currency: string
+  statusCode: string
+  message: string
+  rawResponse?: unknown
+}
+
 export interface SmsProvider {
   sendSms(params: SendSmsParams): Promise<SendSmsResult>
   sendBulkSms(
@@ -31,6 +56,9 @@ export interface SmsProvider {
     message: string,
     senderId: string
   ): Promise<SendSmsResult[]>
+  testConnection?(): Promise<ProviderConnectionResult>
+  getSenderHeaders?(): Promise<ProviderSenderHeadersResult>
+  getCreditStatus?(): Promise<ProviderCreditStatusResult>
 }
 
 class FakeSmsProvider implements SmsProvider {
@@ -87,6 +115,36 @@ class FakeSmsProvider implements SmsProvider {
       )
     )
   }
+  async testConnection(): Promise<ProviderConnectionResult> {
+    return {
+      ok: true,
+      statusCode: "TEST_OK",
+      message: "Test provider bağlantısı hazır",
+      rawResponse: { provider: "test" },
+    }
+  }
+
+  async getSenderHeaders(): Promise<ProviderSenderHeadersResult> {
+    return {
+      ok: true,
+      headers: ["MSGNEX"],
+      statusCode: "TEST_OK",
+      message: "Test provider başlığı hazır",
+      rawResponse: { msgheaders: ["MSGNEX"] },
+    }
+  }
+
+  async getCreditStatus(): Promise<ProviderCreditStatusResult> {
+    return {
+      ok: true,
+      amount: 999999,
+      unit: "sms",
+      currency: "TRY",
+      statusCode: "TEST_OK",
+      message: "Test provider kredi durumu hazır",
+      rawResponse: { balance: [{ amount: 999999, balance_name: "Test SMS" }] },
+    }
+  }
 }
 
 export interface NetgsmProviderConfig {
@@ -107,12 +165,20 @@ class NetgsmProvider implements SmsProvider {
   private readonly appKey: string | null
   private readonly encoding: string
   private readonly timeoutMs: number
+  private readonly balanceEndpoint: string
+  private readonly senderHeadersEndpoint: string
 
   constructor(config?: NetgsmProviderConfig) {
     this.endpoint =
       config?.endpoint ||
       process.env.NETGSM_ENDPOINT ||
       "https://api.netgsm.com.tr/sms/send/xml"
+    this.balanceEndpoint =
+      process.env.NETGSM_BALANCE_ENDPOINT ||
+      "https://api.netgsm.com.tr/balance"
+    this.senderHeadersEndpoint =
+      process.env.NETGSM_HEADERS_ENDPOINT ||
+      "https://api.netgsm.com.tr/sms/rest/v2/msgheader"
     this.userCode = config?.userCode || process.env.NETGSM_USERCODE || ""
     this.password = config?.password || process.env.NETGSM_PASSWORD || ""
     this.defaultHeader = config?.defaultHeader ?? process.env.NETGSM_HEADER ?? null
@@ -233,6 +299,67 @@ class NetgsmProvider implements SmsProvider {
     }))
   }
 
+  async testConnection(): Promise<ProviderConnectionResult> {
+    const headers = await this.getSenderHeaders()
+    return {
+      ok: headers.ok,
+      statusCode: headers.statusCode,
+      message: headers.ok ? "Netgsm bağlantısı doğrulandı" : headers.message,
+      rawResponse: headers.rawResponse,
+    }
+  }
+
+  async getSenderHeaders(): Promise<ProviderSenderHeadersResult> {
+    try {
+      const rawResponse = await this.getJsonWithBasicAuth(this.senderHeadersEndpoint)
+      const code = String(rawResponse?.code ?? "UNKNOWN")
+      const headers = Array.isArray(rawResponse?.msgheaders)
+        ? rawResponse.msgheaders.map((header: unknown) => String(header).trim()).filter(Boolean)
+        : []
+      const ok = code === "00"
+
+      return {
+        ok,
+        headers,
+        statusCode: code,
+        message: ok ? "Netgsm gönderici başlıkları sorgulandı" : this.errorMessage(code, JSON.stringify(rawResponse)),
+        rawResponse,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Netgsm başlık sorgusu tamamlanamadı"
+      return {
+        ok: false,
+        headers: [],
+        statusCode: "PROVIDER_REQUEST_FAILED",
+        message,
+      }
+    }
+  }
+
+  async getCreditStatus(): Promise<ProviderCreditStatusResult> {
+    try {
+      const rawResponse = await this.postJson(this.balanceEndpoint, {
+        usercode: this.userCode,
+        password: this.password,
+        stip: 1,
+      })
+      return {
+        ...this.parseBalanceResponse(rawResponse),
+        rawResponse,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Netgsm kredi sorgusu tamamlanamadı"
+      return {
+        ok: false,
+        amount: null,
+        unit: "sms",
+        currency: "TRY",
+        statusCode: "PROVIDER_REQUEST_FAILED",
+        message,
+      }
+    }
+  }
+
   private normalizeRecipient(recipient: string): string {
     const digits = recipient.replace(/\D/g, "")
     if (digits.length === 12 && digits.startsWith("90")) return digits.slice(2)
@@ -287,6 +414,98 @@ class NetgsmProvider implements SmsProvider {
       return text
     } finally {
       clearTimeout(timeout)
+    }
+  }
+
+  private async getJsonWithBasicAuth(endpoint: string): Promise<any> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
+
+    try {
+      const token = Buffer.from(`${this.userCode}:${this.password}`).toString("base64")
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${token}`,
+          Accept: "application/json",
+        },
+        signal: controller.signal,
+      })
+
+      const text = await response.text()
+      if (!response.ok) {
+        throw new Error(`Netgsm HTTP ${response.status}: ${text || response.statusText}`)
+      }
+
+      return JSON.parse(text)
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  private async postJson(endpoint: string, payload: Record<string, unknown>): Promise<any> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      })
+
+      const text = await response.text()
+      if (!response.ok) {
+        throw new Error(`Netgsm HTTP ${response.status}: ${text || response.statusText}`)
+      }
+
+      return JSON.parse(text)
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  private parseBalanceResponse(rawResponse: any): ProviderCreditStatusResult {
+    const code = rawResponse?.code ? String(rawResponse.code) : "00"
+    if (code !== "00") {
+      return {
+        ok: false,
+        amount: null,
+        unit: "sms",
+        currency: "TRY",
+        statusCode: code,
+        message: this.errorMessage(code, JSON.stringify(rawResponse)),
+      }
+    }
+
+    if (Array.isArray(rawResponse?.balance)) {
+      const firstSmsBalance =
+        rawResponse.balance.find((item: any) => String(item?.balance_name || "").toLowerCase().includes("sms")) ||
+        rawResponse.balance[0]
+      const amount = Number(firstSmsBalance?.amount)
+
+      return {
+        ok: Number.isFinite(amount),
+        amount: Number.isFinite(amount) ? amount : null,
+        unit: firstSmsBalance?.balance_name ? String(firstSmsBalance.balance_name) : "sms",
+        currency: "TRY",
+        statusCode: "00",
+        message: "Netgsm kredi durumu sorgulandı",
+      }
+    }
+
+    const amount = Number(rawResponse?.balance)
+    return {
+      ok: Number.isFinite(amount),
+      amount: Number.isFinite(amount) ? amount : null,
+      unit: "kredi",
+      currency: "TRY",
+      statusCode: "00",
+      message: "Netgsm kredi durumu sorgulandı",
     }
   }
 
@@ -352,6 +571,7 @@ class NetgsmProvider implements SmsProvider {
   private escapeCdata(value: string): string {
     return value.replace(/\]\]>/g, "]]]]><![CDATA[>")
   }
+
 }
 
 export function createSmsProvider(): SmsProvider {

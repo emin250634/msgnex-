@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
         phone,
         status,
         is_active: status !== "suspended" && status !== "rejected",
-        sender_name: companyName.slice(0, 11),
+        sender_name: "",
         sender_approved: false,
       })
       .select("id, name")
