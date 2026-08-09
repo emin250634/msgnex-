@@ -11,11 +11,11 @@ export const metadata: Metadata = {
     default: "MSGNEX | Kurumsal SMS ve İletişim Platformu",
     template: "%s | MSGNEX",
   },
-  description: "Toplu SMS, SMS API, kampanya yönetimi, raporlama ve provider entegrasyonlarını tek panelden yönetin.",
+  description: "Kendi SMS sağlayıcı hesabınızı kullanarak kişi, kampanya, API, webhook, raporlama ve denetim süreçlerini tek panelden yönetin.",
   openGraph: {
     url: "/",
     title: "MSGNEX | Kurumsal SMS ve İletişim Platformu",
-    description: "Kurumsal SMS operasyonlarınızı güvenli ve kontrollü biçimde tek panelden yönetin.",
+    description: "Kendi SMS sağlayıcı hesabınızla kurumsal iletişim operasyonlarınızı güvenli ve kontrollü biçimde tek panelden yönetin.",
     type: "website",
     locale: "tr_TR",
     images: [{ url: "/background.png", width: 1678, height: 944, alt: "MSGNEX iletişim platformu" }],

@@ -2,24 +2,37 @@ import Link from "next/link"
 import { BrandLogo } from "@/components/ui/brand-logo"
 
 const capabilities = [
-  ["SMS API", "Uygulamalarınızı güvenli ve izlenebilir SMS API ile bağlayın.", "api"],
-  ["Toplu SMS", "Segmentlerinize kontrollü toplu gönderimler hazırlayın.", "send"],
-  ["Kampanyalar", "Kampanya hazırlama, onay ve gönderim süreçlerini yönetin.", "campaign"],
-  ["Raporlama", "Provider, DLR ve teslimat performansını tek merkezden izleyin.", "chart"],
+  ["Kendi Provider Hesabınız", "Yetkili SMS sağlayıcınızdan aldığınız hesabı MSGNEX'e bağlayın; SMS kredisi sağlayıcı tarafında kalır.", "provider"],
+  ["Onaylı Başlık Güvenliği", "Gönderici başlığı panelden rastgele yazılmaz, sağlayıcıdan gelen onaylı başlık kullanılır.", "shield"],
+  ["Kampanya ve CRM Yönetimi", "Kişi, segment, şablon, kara liste ve kampanya süreçlerini tek panelden yönetin.", "campaign"],
+  ["Raporlama ve Denetim", "Provider sonucu, başarısız numara, audit log, API ve webhook olaylarını izleyin.", "chart"],
 ]
 
 const trustItems = [
-  ["SMS API", "Sistemlerinize entegre"],
-  ["Çoklu Firma Desteği", "Firma bazlı yönetim"],
-  ["Güvenli Altyapı", "Rol ve veri izolasyonu"],
-  ["Kampanya Yönetimi", "Kontrollü operasyon"],
+  ["SMS kredisi satışı yok", "Sağlayıcı hesabınız kullanılır"],
+  ["Onaylı başlık", "Marka taklidi engellenir"],
+  ["Kurulum checklist", "Pilot başlangıç netleşir"],
+  ["Audit ve uyarılar", "Operasyon izlenebilir"],
 ]
 
 const steps = [
   ["01", "Demo Talebi", "Firmanızın iletişim hacmini ve ihtiyaçlarını paylaşın."],
-  ["02", "Firma Onayı", "Hesabınız doğrulama ve yönetici onayı sonrası hazırlanır."],
-  ["03", "Provider Bağlantısı", "Firma hesabınıza ait provider bilgileri güvenle bağlanır."],
-  ["04", "SMS Gönderimi", "Kampanyalarınızı hazırlayın, gönderin ve sonuçları izleyin."],
+  ["02", "Provider Hazırlığı", "Yetkili SMS sağlayıcı hesabınız ve onaylı başlığınız doğrulanır."],
+  ["03", "Pilot Kurulum", "Kişi listesi, test segmenti, ilk şablon ve test kampanyası checklist ile tamamlanır."],
+  ["04", "Operasyon Takibi", "Kampanya sonuçları, API/webhook olayları, bildirimler ve audit kayıtları izlenir."],
+]
+
+const differentiators = [
+  ["SMS kredisi satmayız", "MSGNEX'in işi kredi veya başlık satmak değil; firmanızın kendi sağlayıcı hesabını daha düzenli ve ölçülebilir kullanmasını sağlamaktır."],
+  ["Başlık sağlayıcıdan gelir", "Firma panelde farklı marka adı yazamaz. Gönderimler sadece sağlayıcı hesabında tanımlı başlıkla hazırlanır."],
+  ["Pilot süreci takip edilir", "Müşteri kurulum ekranı ve admin onboarding takibiyle provider, kişi listesi ve ilk test kampanyası kontrol altında ilerler."],
+]
+
+const operations = [
+  ["Kurulum", "Provider bağlantısı, başlık, kişi listesi ve test kampanyası adımları görünür."],
+  ["Gönderim", "İzin, kara liste, segment, SMS parçası ve sağlayıcı başlığı gönderim öncesi kontrol edilir."],
+  ["Raporlama", "Başarılı, hatalı, bekleyen ve provider hata kodları kampanya raporunda ayrılır."],
+  ["Entegrasyon", "API key, rate limit, webhook secret ve delivery gözlemi kurumsal entegrasyonlara hazırlanır."],
 ]
 
 export default function Home() {
@@ -36,12 +49,12 @@ export default function Home() {
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               Kontrollü Beta Programı
             </div>
-            <h1 className="mt-7 text-4xl font-semibold leading-[1.08] sm:text-5xl lg:text-[3.7rem]">
-              Kurumsal SMS Operasyonlarınızı
-              <span className="mt-2 block text-blue-300">Tek Platformdan Yönetin</span>
+            <h1 className="mt-7 text-4xl font-semibold leading-[1.08] sm:text-5xl lg:text-[3.55rem]">
+              SMS sağlayıcınızı değiştirmeden
+              <span className="mt-2 block text-blue-300">iletişim operasyonunuzu yönetin</span>
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 sm:text-lg">
-              Toplu SMS, SMS API, rehber yönetimi, kampanya planlama ve raporlama işlemlerini tek panelden yönetin.
+              MSGNEX SMS kredisi satmaz. Firmanızın kendi yetkili SMS sağlayıcı hesabını güvenli şekilde bağlar; kişi, kampanya, API, webhook, raporlama ve denetim süreçlerini tek panelde toplar.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link href="/demo-request" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-7 py-4 text-base font-semibold text-white shadow-xl shadow-blue-950/40 transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-2xl">
@@ -53,7 +66,7 @@ export default function Home() {
               </a>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-7 gap-y-4 border-t border-white/15 pt-7 text-sm font-medium text-slate-200">
-              {["Firma bazlı veri izolasyonu", "Şifrelenmiş provider secret", "Rol tabanlı erişim"].map((item) => (
+              {["Kendi sağlayıcı hesabınız", "Onaylı gönderici başlığı", "Audit log ve bildirim merkezi"].map((item) => (
                 <span key={item} className="flex items-center gap-2.5"><span className="flex h-6 w-6 items-center justify-center rounded-full border border-emerald-300/50 bg-emerald-400/10 text-xs text-emerald-300">✓</span>{item}</span>
               ))}
             </div>
@@ -76,9 +89,23 @@ export default function Home() {
         </div>
       </section>
 
+      <section id="konum" className="border-b border-slate-200 bg-white py-20 sm:py-24">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-start">
+          <SectionHeading eyebrow="MSGNEX neyi çözer?" title="SMS göndermekten fazlası: kontrollü müşteri iletişim operasyonu" description="Sağlayıcı hesabı sizde kalır. MSGNEX bu hesabın etrafına CRM, kampanya, izin, kara liste, raporlama, API, webhook ve denetim katmanı ekler." />
+          <div className="grid gap-4">
+            {differentiators.map(([title, description]) => (
+              <article key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+                <h3 className="font-semibold text-slate-950">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="ozellikler" className="border-b border-slate-200 bg-slate-50 py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Platform yetenekleri" title="SMS operasyonunun tamamı tek çalışma alanında" description="Dağınık araçlar yerine ekiplerin tekrar tekrar kullanabileceği sade, güvenli ve ölçülebilir operasyon akışı." />
+          <SectionHeading eyebrow="Platform yetenekleri" title="Pilot müşteriden kurumsal operasyona uzanan çalışma alanı" description="Dağınık Excel listeleri, manuel başlık riski ve belirsiz provider sonuçları yerine ekiplerin tekrar kullanabileceği kontrollü akış." />
           <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 md:grid-cols-2 lg:grid-cols-4">
             {capabilities.map(([title, description, icon]) => (
               <article key={title} className="flex min-h-64 flex-col bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
@@ -93,7 +120,7 @@ export default function Home() {
 
       <section id="platform" className="py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <SectionHeading eyebrow="Nasıl çalışır?" title="İlk talepten güvenli gönderime kadar kontrollü süreç" description="Firma hesabınız ve provider bağlantınız doğrulandıktan sonra ekibiniz operasyon panelini kullanmaya başlar." />
+          <SectionHeading eyebrow="Nasıl çalışır?" title="İlk talepten pilot kullanıma kadar kontrollü süreç" description="Firma sağlayıcı hesabı ve onaylı başlık hazırlandıktan sonra müşteri kurulum checklist'iyle ilk test kampanyasına ilerler." />
           <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {steps.map(([number, title, description]) => (
               <article key={number} className="relative border-t-2 border-blue-600 pt-6">
@@ -106,19 +133,33 @@ export default function Home() {
         </div>
       </section>
 
+      <section id="operasyon" className="border-y border-slate-200 bg-white py-20 sm:py-24">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <SectionHeading eyebrow="Operasyon katmanı" title="Müşteri paneli ve admin takibi aynı hedefe çalışır" description="Müşteri kendi kurulumunu ve bildirimlerini görürken, admin firma onboarding, satış/pilot durumu ve provider hazırlığını takip eder." />
+          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {operations.map(([title, description]) => (
+              <article key={title} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-semibold text-blue-700">{title}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="guvenlik" className="border-y border-slate-200 bg-[#f5f8fc] py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center">
           <div>
             <p className="text-sm font-semibold text-blue-700">Güvenlik temelden başlar</p>
             <h2 className="mt-3 max-w-xl text-3xl font-semibold leading-tight text-slate-950 sm:text-4xl">Firma erişimi, provider bilgileri ve operasyon yetkileri ayrıştırılır.</h2>
-            <p className="mt-5 max-w-xl leading-7 text-slate-600">Kritik SMS operasyonları için kullanıcı rolleri, firma sınırları ve provider kimlik bilgileri ayrı güvenlik katmanlarıyla yönetilir.</p>
+            <p className="mt-5 max-w-xl leading-7 text-slate-600">Kritik SMS operasyonları için kullanıcı rolleri, firma sınırları, provider secret yönetimi, API rate limit, webhook imzası ve audit log ayrı güvenlik katmanlarıyla yönetilir.</p>
             <Link href="/demo-request" className="mt-7 inline-flex items-center text-sm font-semibold text-blue-700 hover:text-blue-800">Güvenli onboarding başlatın <span className="ml-2">→</span></Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
               ["company", "Firma Bazlı İzolasyon", "Her kullanıcı yalnızca kabul edilmiş ve aktif firma üyeliklerine erişir."],
-              ["shield", "Şifrelenmiş Secret", "Provider şifreleri kullanıcı ekranlarında ve API yanıtlarında gösterilmez."],
-              ["contacts", "Rol Bazlı Erişim", "Owner, admin ve kullanıcı yetkileri operasyon seviyesinde ayrıştırılır."],
+              ["shield", "Gizli Provider Bilgisi", "Provider secret kullanıcı ekranlarında ve API yanıtlarında gösterilmez."],
+              ["api", "API ve Webhook Kontrolü", "API anahtarları, rate limit, imzalı webhook ve audit kayıtları izlenebilir."],
             ].map(([icon, title, description]) => (
               <article key={title} className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-white"><FeatureIcon name={icon} /></span>
@@ -132,7 +173,7 @@ export default function Home() {
 
       <section id="iletisim" className="bg-[#071426] py-16 text-white">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-5 sm:px-8 lg:flex-row lg:items-center">
-          <div><p className="text-sm font-semibold text-blue-300">Kontrollü beta programı</p><h2 className="mt-2 text-3xl font-semibold">SMS operasyonunuzu MSGNEX ile planlayın.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">İhtiyaçlarınızı değerlendirelim, firma onboarding ve provider bağlantı sürecini birlikte hazırlayalım.</p></div>
+          <div><p className="text-sm font-semibold text-blue-300">Kontrollü beta programı</p><h2 className="mt-2 text-3xl font-semibold">SMS sağlayıcı hesabınızı operasyon paneline dönüştürün.</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">İhtiyaçlarınızı değerlendirelim, firma onboarding ve provider bağlantı sürecini birlikte hazırlayalım.</p></div>
           <Link href="/demo-request" className="shrink-0 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500">Demo Talep Et</Link>
         </div>
       </section>
@@ -148,6 +189,7 @@ function Navbar() {
       <div className="mx-auto flex h-24 max-w-7xl items-center justify-between px-5 sm:px-8">
         <Link href="/" aria-label="MSGNEX ana sayfa" className="flex items-center"><BrandLogo size="md" className="h-14 max-w-[220px]" /></Link>
         <nav className="hidden items-center gap-10 text-lg font-semibold text-slate-800 lg:flex">
+          <a href="#konum" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Yaklaşım</a>
           <a href="#ozellikler" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Özellikler</a>
           <a href="#platform" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Platform</a>
           <a href="#guvenlik" className="relative py-3 transition-colors after:absolute after:inset-x-0 after:bottom-1 after:h-0.5 after:origin-left after:scale-x-0 after:bg-blue-600 after:transition-transform hover:text-blue-700 hover:after:scale-x-100">Güvenlik</a>
@@ -186,7 +228,7 @@ function DashboardMockup() {
           <div className="min-w-0 bg-[#f6f8fc] p-4 text-slate-950 sm:p-5">
             <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-semibold text-blue-700">OPERASYON ÖZETİ</p><p className="mt-1 text-base font-semibold">Genel Bakış</p></div><span className="rounded-md bg-blue-600 px-3 py-2 text-[9px] font-semibold text-white">SMS Gönder</span></div>
             <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {[["Gönderim", "24.860", "blue"], ["İletildi", "%96,8", "green"], ["Kampanya", "18", "navy"], ["Provider", "Netgsm", "amber"]].map(([label, value, tone]) => (
+              {[["Kurulum", "%82", "blue"], ["İletildi", "%96,8", "green"], ["Audit", "124", "navy"], ["Provider", "Hazır", "amber"]].map(([label, value, tone]) => (
                 <div key={label} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm"><span className={`block h-1.5 w-6 rounded-full ${tone === "green" ? "bg-emerald-500" : tone === "amber" ? "bg-amber-500" : tone === "navy" ? "bg-slate-800" : "bg-blue-600"}`} /><p className="mt-3 text-[9px] text-slate-500">{label}</p><p className="mt-1 text-base font-semibold">{value}</p></div>
               ))}
             </div>
@@ -200,7 +242,7 @@ function DashboardMockup() {
               </div>
               <div className="rounded-md bg-[#0a1b35] p-4 text-white shadow-sm"><p className="text-[9px] font-semibold text-blue-200">Başarı Oranı</p><div className="mx-auto mt-5 flex h-24 w-24 items-center justify-center rounded-full border-[10px] border-blue-500 border-r-blue-200/20"><div className="text-center"><p className="text-xl font-semibold">%96,8</p><p className="text-[7px] text-slate-400">iletim</p></div></div><div className="mt-5 flex items-center justify-between text-[8px]"><span className="text-slate-400">DLR bekleyen</span><span className="font-semibold text-amber-300">126</span></div></div>
             </div>
-            <div className="mt-3 rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[9px] font-semibold">Son Kampanya</p><p className="mt-1 text-[8px] text-slate-400">Yaz dönemi müşteri iletişimi</p></div><div className="flex items-center gap-4 text-right"><div><p className="text-[7px] text-slate-400">Alıcı</p><p className="text-[9px] font-semibold">2.480</p></div><div><p className="text-[7px] text-slate-400">Durum</p><p className="text-[9px] font-semibold text-emerald-600">Tamamlandı</p></div></div></div></div>
+            <div className="mt-3 rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[9px] font-semibold">Sıradaki Aksiyon</p><p className="mt-1 text-[8px] text-slate-400">Pilot kurulum checklist</p></div><div className="flex items-center gap-4 text-right"><div><p className="text-[7px] text-slate-400">Eksik</p><p className="text-[9px] font-semibold">Başlık sorgusu</p></div><div><p className="text-[7px] text-slate-400">Durum</p><p className="text-[9px] font-semibold text-amber-600">Takipte</p></div></div></div></div>
           </div>
         </div>
       </div>
@@ -220,6 +262,7 @@ function FeatureIcon({ name }: { name: string }) {
     contacts: <><circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" /></>,
     campaign: <><path d="M5 8h14M5 12h10M5 16h7" /><path d="M4 4h16v16H4z" /></>,
     company: <><path d="M4 21V5h10v16M14 9h6v12M8 9h2M8 13h2M8 17h2" /></>,
+    provider: <><path d="M4 7h16v12H4z" /><path d="M16 7V5H6" /><circle cx="12" cy="13" r="2" /></>,
     shield: <><path d="M12 3 5 6v5c0 5 3 8 7 10 4-2 7-5 7-10V6z" /><path d="m9 12 2 2 4-4" /></>,
   }
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">{paths[name]}</svg>
@@ -231,9 +274,9 @@ function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1.35fr_repeat(4,minmax(0,0.65fr))]">
         <div className="lg:border-r lg:border-slate-200 lg:pr-10">
           <BrandLogo size="lg" className="h-auto w-[240px] max-w-full" />
-          <p className="mt-5 max-w-sm text-sm leading-7 text-slate-600">Kurumsal SMS ve iletişim operasyonlarını güvenli, ölçülebilir ve kontrollü biçimde tek panelden yönetin.</p>
+          <p className="mt-5 max-w-sm text-sm leading-7 text-slate-600">Kendi SMS sağlayıcı hesabınızı kullanarak müşteri iletişiminizi güvenli, ölçülebilir ve kontrollü biçimde tek panelden yönetin.</p>
         </div>
-        <FooterColumn title="Platform" links={[["Özellikler", "#ozellikler"], ["SMS API", "#ozellikler"], ["Kampanyalar", "#platform"], ["Raporlama", "#ozellikler"]]} />
+        <FooterColumn title="Platform" links={[["Yaklaşım", "#konum"], ["Özellikler", "#ozellikler"], ["Kampanyalar", "#platform"], ["Operasyon", "#operasyon"]]} />
         <FooterColumn title="Kurumsal" links={[["Güvenlik", "#guvenlik"], ["KVKK", "/kvkk"], ["Gizlilik Politikası", "/privacy"], ["Kullanım Şartları", "/terms"]]} />
         <FooterColumn title="Destek" links={[["İletişim", "#iletisim"], ["Demo Talep Et", "/demo-request"], ["Giriş Yap", "/login"]]} />
         <FooterColumn title="Hakkımızda" links={[["MSGNEX Hakkında", "#platform"], ["Beta Programı", "/demo-request"], ["Güvenli Altyapı", "#guvenlik"]]} />
