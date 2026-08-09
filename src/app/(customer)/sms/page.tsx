@@ -77,18 +77,36 @@ export default function SmsPage() {
   }, [contacts, manualRecipients, selectedGroup])
 
   const suppressionSet = useMemo(() => new Set(suppressionPhones), [suppressionPhones])
+  const contactConsentMap = useMemo(() => {
+    const map = new Map<string, Contact["consent_status"]>()
+    contacts.forEach((contact) => {
+      const normalizedPhone = normalizePhone(contact.phone)
+      if (normalizedPhone) map.set(normalizedPhone, contact.consent_status || "unknown")
+    })
+    return map
+  }, [contacts])
   const suppressedRecipients = useMemo(
     () => selectedRecipients.filter((recipient) => suppressionSet.has(recipient)),
     [selectedRecipients, suppressionSet]
   )
+  const optedOutRecipients = useMemo(
+    () => selectedRecipients.filter((recipient) => contactConsentMap.get(recipient) === "opted_out"),
+    [contactConsentMap, selectedRecipients]
+  )
+  const unknownConsentRecipients = useMemo(
+    () => selectedRecipients.filter((recipient) => (contactConsentMap.get(recipient) ?? "unknown") === "unknown"),
+    [contactConsentMap, selectedRecipients]
+  )
   const sendableRecipients = useMemo(
-    () => selectedRecipients.filter((recipient) => !suppressionSet.has(recipient)),
-    [selectedRecipients, suppressionSet]
+    () => selectedRecipients.filter((recipient) => !suppressionSet.has(recipient) && contactConsentMap.get(recipient) !== "opted_out"),
+    [contactConsentMap, selectedRecipients, suppressionSet]
   )
 
   const recipientCount = selectedRecipients.length
   const sendableRecipientCount = sendableRecipients.length
   const suppressedRecipientCount = suppressedRecipients.length
+  const optedOutRecipientCount = optedOutRecipients.length
+  const unknownConsentRecipientCount = unknownConsentRecipients.length
   const segmentInfo = calculateSmsSegments(message)
   const cost = sendableRecipientCount * segmentInfo.segments
   const selectedGroupName = selectedGroup === ALL_CONTACTS
@@ -152,7 +170,7 @@ export default function SmsPage() {
       return
     }
     if (sendableRecipientCount === 0) {
-      toast.error("Seçilen alıcıların tamamı kara listede")
+      toast.error("Seçilen alıcıların tamamı kara listede veya izinsiz")
       return
     }
     if (requiresAllContactsApproval && !confirmAllContacts) {
@@ -170,7 +188,7 @@ export default function SmsPage() {
     setLoading(true)
     setQueuedCampaignId(null)
 
-    const recipients = selectedRecipients
+    const recipients = sendableRecipients
     if (recipients.length === 0) {
       toast.error("Gönderilecek kişi bulunamadı. Segment seçin veya numara girin.")
       setLoading(false)
@@ -352,14 +370,16 @@ export default function SmsPage() {
           <SummaryItem label="Seçilen alıcı" value={recipientCount.toString()} />
           <SummaryItem label="Gönderilecek" value={sendableRecipientCount.toString()} />
           <SummaryItem label="Kara listede atlanacak" value={suppressedRecipientCount.toString()} emphasize={suppressedRecipientCount > 0} />
+          <SummaryItem label="İzinsiz atlanacak" value={optedOutRecipientCount.toString()} emphasize={optedOutRecipientCount > 0} />
           <SummaryItem label="Tahmini sağlayıcı kredi kullanımı" value={`${cost} SMS parçası`} />
-          <SummaryItem label="Segment / kaynak" value={selectedGroupName} />
           <SummaryItem label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
         </div>
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
           <RiskCheck label="Provider başlığı" value={senderId || "Tanımlı değil"} ok={providerReady && Boolean(senderId)} />
-          <RiskCheck label="Kara liste kontrolü" value={suppressedRecipientCount > 0 ? `${suppressedRecipientCount} numara atlanacak` : "Atlanacak numara yok"} ok />
+          <RiskCheck label="İzin kontrolü" value={optedOutRecipientCount > 0 ? `${optedOutRecipientCount} izinsiz numara atlanacak` : `${unknownConsentRecipientCount} izin durumu bilinmeyen alıcı`} ok={optedOutRecipientCount === 0} />
+          <RiskCheck label="Kara liste kontrolü" value={suppressedRecipientCount > 0 ? `${suppressedRecipientCount} numara atlanacak` : "Atlanacak numara yok"} ok={suppressedRecipientCount === 0} />
           <RiskCheck label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" ok />
+          <RiskCheck label="Segment / kaynak" value={selectedGroupName} ok />
         </div>
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
           <p className="text-xs font-semibold uppercase text-gray-500">Mesaj önizleme</p>
@@ -375,6 +395,7 @@ export default function SmsPage() {
               <p className="mt-1">
                 Tahmini {cost} SMS parçası firmanızın sağlayıcı hesabındaki krediden kullanılacak.
                 {suppressedRecipientCount > 0 ? ` ${suppressedRecipientCount} kara listedeki numara gönderimden çıkarılacak.` : ""}
+                {optedOutRecipientCount > 0 ? ` ${optedOutRecipientCount} izinsiz numara gönderimden çıkarılacak.` : ""}
                 {" "}Kampanya kuyruğa alınır.
               </p>
             </div>

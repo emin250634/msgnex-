@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { createClient } from "@/lib/supabase/client"
-import type { Contact, Group, SmsMessage } from "@/types"
+import type { Contact, ContactConsentEvent, Group, SmsMessage } from "@/types"
 
 function formatDate(value?: string | null) {
   if (!value) return "-"
@@ -34,6 +34,18 @@ function statusTone(status: SmsMessage["status"]) {
   return "warning" as const
 }
 
+function consentLabel(value?: Contact["consent_status"] | null) {
+  if (value === "opted_in") return "İzinli"
+  if (value === "opted_out") return "İzinsiz"
+  return "Bilinmiyor"
+}
+
+function consentTone(value?: Contact["consent_status"] | null) {
+  if (value === "opted_in") return "success" as const
+  if (value === "opted_out") return "danger" as const
+  return "warning" as const
+}
+
 function isRecentContact(contact: Contact) {
   const createdAt = new Date(contact.created_at).getTime()
   if (Number.isNaN(createdAt)) return false
@@ -45,6 +57,7 @@ function contactTags(contact: Contact, group: Group | null) {
   if (group?.name) tags.push(group.name)
   if (group?.name?.toLowerCase().includes("vip")) tags.push("VIP")
   if (contact.email) tags.push("E-posta var")
+  tags.push(consentLabel(contact.consent_status))
   if (isRecentContact(contact)) tags.push("Yeni kayıt")
   if (!group) tags.push("Segmentsiz")
   return Array.from(new Set(tags))
@@ -55,6 +68,7 @@ export default function ContactDetailPage() {
   const [contact, setContact] = useState<Contact | null>(null)
   const [group, setGroup] = useState<Group | null>(null)
   const [messages, setMessages] = useState<SmsMessage[]>([])
+  const [consentEvents, setConsentEvents] = useState<ContactConsentEvent[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -83,14 +97,23 @@ export default function ContactDetailPage() {
       }
 
       if (contactRow?.company_id && contactRow?.phone) {
-        const { data: messageRows } = await supabase
-          .from("sms_messages")
-          .select("*")
-          .eq("company_id", contactRow.company_id)
-          .eq("recipient", contactRow.phone)
-          .order("created_at", { ascending: false })
-          .limit(25)
+        const [{ data: messageRows }, { data: consentRows }] = await Promise.all([
+          supabase
+            .from("sms_messages")
+            .select("*")
+            .eq("company_id", contactRow.company_id)
+            .eq("recipient", contactRow.phone)
+            .order("created_at", { ascending: false })
+            .limit(25),
+          supabase
+            .from("contact_consent_events")
+            .select("*")
+            .eq("contact_id", contactRow.id)
+            .order("recorded_at", { ascending: false })
+            .limit(20),
+        ])
         setMessages(messageRows ?? [])
+        setConsentEvents(consentRows ?? [])
       }
 
       setLoading(false)
@@ -138,6 +161,14 @@ export default function ContactDetailPage() {
               <Info label="Telefon" value={contact.phone} />
               <Info label="E-posta" value={contact.email || "-"} />
               <Info label="Segment" value={group?.name || "Segmentsiz"} />
+              <div>
+                <p className="text-xs font-semibold uppercase text-gray-500">Ticari ileti izni</p>
+                <div className="mt-1">
+                  <StatusBadge label={consentLabel(contact.consent_status)} tone={consentTone(contact.consent_status)} />
+                </div>
+              </div>
+              <Info label="İzin Kaynağı" value={contact.consent_source || "-"} />
+              <Info label="İzin Tarihi" value={formatDate(contact.consent_recorded_at)} />
               <Info label="Kayıt Tarihi" value={formatDate(contact.created_at)} />
             </div>
           </Card>
@@ -148,6 +179,27 @@ export default function ContactDetailPage() {
                 <StatusBadge key={tag} label={tag} tone={tag.toLowerCase().includes("vip") ? "purple" : "info"} />
               ))}
             </div>
+          </Card>
+
+          <Card title="İzin Geçmişi">
+            {consentEvents.length > 0 ? (
+              <div className="space-y-3">
+                {consentEvents.map((event) => (
+                  <div key={event.id} className="rounded-xl border border-gray-200 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <StatusBadge label={consentLabel(event.next_status)} tone={consentTone(event.next_status)} />
+                      <span className="text-xs text-gray-500">{formatDate(event.recorded_at)}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Önceki: {consentLabel(event.previous_status)} · Kaynak: {event.source || "-"}
+                    </p>
+                    {event.note && <p className="mt-2 text-sm text-gray-500">{event.note}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="İzin geçmişi yok" description="Bu kişi için kayıtlı izin değişikliği bulunmuyor." />
+            )}
           </Card>
         </div>
 

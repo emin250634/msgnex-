@@ -119,12 +119,26 @@ Başlanan işler:
   - kullanıcı silme
   - firma kullanıcı rol/aktiflik değişimi
   - firma kullanıcı üyeliği silme
+- Kişi bazlı ticari ileti izni başlatıldı:
+  - kişi kayıtlarında izinli/izinsiz/bilinmiyor durumu
+  - manuel kişi ekleme izin seçimi
+  - CSV import varsayılan izin seçimi
+  - kişi listesinde izin durumu filtresi
+  - izin değişikliği geçmişi
+  - kişi detayında izin kanıtı/tarihçesi
+  - SMS gönderim öncesi izinsiz kişi özeti
+  - izinsiz kişilerin SMS payload'ından çıkarılması
+- Kara liste yönetimi güçlendirildi:
+  - arama
+  - toplam/son eklenen istatistikleri
+  - güvenli gönderim açıklaması
+  - CSV format yönlendirmesi
 
 Yapılacaklar:
 
-- KVKK/izinli iletişim ekranlarını güçlendirmek.
-- Kara liste yönetimini daha görünür hale getirmek.
-- İçe aktarılan kişiler için izin durumu alanı eklemek.
+- KVKK/izinli iletişim ekranlarını detaylandırmak.
+- Kara liste/açık ret kayıtlarını raporlama tarafına bağlamak.
+- İzin kanıtı dışa aktarma akışını geliştirmek.
 - Firma bazlı audit log filtrelerini geliştirmek.
 - Kritik admin işlemleri kapsamını genişletmek.
 - Provider secret değişimlerini maskelemek ve geçmişini göstermek.

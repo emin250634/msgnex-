@@ -8,10 +8,17 @@ import type { CsvContactRow } from "@/types"
 
 interface CsvUploadProps {
   groupId?: string
+  defaultConsentStatus?: CsvContactRow["consent_status"]
   onComplete: (imported: number, errors: { row: number; message: string }[]) => void
 }
 
-export function CsvUpload({ groupId, onComplete }: CsvUploadProps) {
+function consentLabel(value?: CsvContactRow["consent_status"]) {
+  if (value === "opted_in") return "İzinli"
+  if (value === "opted_out") return "İzinsiz"
+  return "Bilinmiyor"
+}
+
+export function CsvUpload({ groupId, defaultConsentStatus = "unknown", onComplete }: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState<CsvContactRow[]>([])
@@ -32,7 +39,7 @@ export function CsvUpload({ groupId, onComplete }: CsvUploadProps) {
     setLoading(true)
 
     try {
-      const res = await importContactsFromCsv(result.data, groupId)
+      const res = await importContactsFromCsv(result.data, groupId, defaultConsentStatus)
       onComplete(res.imported, result.errors)
     } catch (err) {
       onComplete(0, [{ row: 0, message: (err as Error).message }])
@@ -61,7 +68,7 @@ export function CsvUpload({ groupId, onComplete }: CsvUploadProps) {
           <ul className="space-y-1">
             {preview.map((c, i) => (
               <li key={i} className="text-sm text-gray-700">
-                {c.first_name} {c.last_name} - {c.phone}
+                {c.first_name} {c.last_name} - {c.phone} - {consentLabel(c.consent_status || defaultConsentStatus)}
               </li>
             ))}
           </ul>

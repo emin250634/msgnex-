@@ -71,6 +71,10 @@ export interface Contact {
   phone: string
   email: string | null
   group_id: string | null
+  consent_status: "unknown" | "opted_in" | "opted_out"
+  consent_source: string | null
+  consent_recorded_at: string | null
+  consent_note: string | null
   created_at: string
   updated_at: string
 }
@@ -150,6 +154,19 @@ export interface SuppressionEntry {
   created_at: string
 }
 
+export interface ContactConsentEvent {
+  id: string
+  company_id: string
+  contact_id: string | null
+  phone: string
+  previous_status: "unknown" | "opted_in" | "opted_out" | null
+  next_status: "unknown" | "opted_in" | "opted_out"
+  source: string | null
+  note: string | null
+  recorded_by: string | null
+  recorded_at: string
+}
+
 export interface SmsTemplate {
   id: string
   company_id: string
@@ -164,6 +181,9 @@ export interface CsvContactRow {
   last_name?: string
   phone: string
   email?: string
+  consent_status?: "unknown" | "opted_in" | "opted_out"
+  consent_source?: string
+  consent_note?: string
 }
 
 export interface CompanyUser {

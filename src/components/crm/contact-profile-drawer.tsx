@@ -25,6 +25,18 @@ function statusTone(status: SmsMessage["status"]) {
   return "warning" as const
 }
 
+function consentLabel(value?: Contact["consent_status"] | null) {
+  if (value === "opted_in") return "İzinli"
+  if (value === "opted_out") return "İzinsiz"
+  return "Bilinmiyor"
+}
+
+function consentTone(value?: Contact["consent_status"] | null) {
+  if (value === "opted_in") return "success" as const
+  if (value === "opted_out") return "danger" as const
+  return "warning" as const
+}
+
 export function ContactProfileDrawer({ contact, group, tags, onClose }: ContactProfileDrawerProps) {
   const [messages, setMessages] = useState<SmsMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -71,6 +83,13 @@ export function ContactProfileDrawer({ contact, group, tags, onClose }: ContactP
             <div className="grid gap-4 sm:grid-cols-2">
               <Info label="E-posta" value={contact.email || "-"} />
               <Info label="Grup / Segment" value={group?.name || "Atanmamış"} />
+              <div>
+                <p className="text-xs font-medium uppercase text-gray-500">Ticari ileti izni</p>
+                <div className="mt-1">
+                  <StatusBadge label={consentLabel(contact.consent_status)} tone={consentTone(contact.consent_status)} />
+                </div>
+              </div>
+              <Info label="İzin Kaynağı" value={contact.consent_source || "-"} />
               <Info label="Kayıt Tarihi" value={formatDate(contact.created_at)} />
               <Info label="Son Güncelleme" value={formatDate(contact.updated_at)} />
             </div>

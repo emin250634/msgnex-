@@ -16,11 +16,13 @@ import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
+import { recordContactConsentEvent } from "@/services/contacts"
 import type { Contact, Group } from "@/types"
 
 const PAGE_SIZE = 15
 
 type TagFilter = "all" | "vip" | "email" | "new" | "unassigned"
+type ConsentStatus = Contact["consent_status"]
 
 function formatDate(value?: string | null) {
   if (!value) return "-"
@@ -29,6 +31,18 @@ function formatDate(value?: string | null) {
 
 function fullName(contact: Contact) {
   return `${contact.first_name}${contact.last_name ? ` ${contact.last_name}` : ""}`
+}
+
+function consentLabel(value?: ConsentStatus | null) {
+  if (value === "opted_in") return "İzinli"
+  if (value === "opted_out") return "İzinsiz"
+  return "Bilinmiyor"
+}
+
+function consentTone(value?: ConsentStatus | null) {
+  if (value === "opted_in") return "success" as const
+  if (value === "opted_out") return "danger" as const
+  return "warning" as const
 }
 
 function isRecentContact(contact: Contact) {
@@ -44,6 +58,7 @@ function deriveContactTags(contact: Contact, group?: Group | null) {
   if (groupName) tags.push(groupName)
   if (groupName?.toLowerCase().includes("vip")) tags.push("VIP")
   if (contact.email) tags.push("E-posta var")
+  tags.push(consentLabel(contact.consent_status))
   if (isRecentContact(contact)) tags.push("Yeni kayıt")
   if (!groupName) tags.push("Segmentsiz")
 
@@ -68,6 +83,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("")
   const [groupFilter, setGroupFilter] = useState("all")
   const [tagFilter, setTagFilter] = useState<TagFilter>("all")
+  const [consentFilter, setConsentFilter] = useState<"all" | ConsentStatus>("all")
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Partial<Contact>>({})
@@ -78,8 +94,10 @@ export default function ContactsPage() {
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const [groupId, setGroupId] = useState("")
+  const [consentStatus, setConsentStatus] = useState<ConsentStatus>("unknown")
   const [adding, setAdding] = useState(false)
   const [csvGroupId, setCsvGroupId] = useState("")
+  const [csvConsentStatus, setCsvConsentStatus] = useState<ConsentStatus>("unknown")
 
   const groupMap = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups])
 
@@ -145,17 +163,15 @@ export default function ContactsPage() {
       const matchesGroup =
         groupFilter === "all" ||
         (groupFilter === "unassigned" ? !contact.group_id : contact.group_id === groupFilter)
+      const matchesConsent = consentFilter === "all" || contact.consent_status === consentFilter
 
-      return matchesSearch && matchesGroup && hasTag(contact, group, tagFilter)
+      return matchesSearch && matchesGroup && matchesConsent && hasTag(contact, group, tagFilter)
     })
-  }, [contacts, groupFilter, groupMap, search, tagFilter])
+  }, [consentFilter, contacts, groupFilter, groupMap, search, tagFilter])
 
-  const vipCount = contacts.filter((contact) => {
-    const group = contact.group_id ? groupMap.get(contact.group_id) ?? null : null
-    return Boolean(group?.name?.toLowerCase().includes("vip"))
-  }).length
-  const emailCount = contacts.filter((contact) => Boolean(contact.email)).length
   const unassignedCount = contacts.filter((contact) => !contact.group_id).length
+  const consentedCount = contacts.filter((contact) => contact.consent_status === "opted_in").length
+  const optedOutCount = contacts.filter((contact) => contact.consent_status === "opted_out").length
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 
   const paged = useMemo(() => {
@@ -165,7 +181,7 @@ export default function ContactsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, groupFilter, tagFilter])
+  }, [search, groupFilter, tagFilter, consentFilter])
 
   const handleDelete = async (id: string) => {
     const supabase = createClient()
@@ -182,6 +198,9 @@ export default function ContactsPage() {
       phone: contact.phone,
       email: contact.email || "",
       group_id: contact.group_id,
+      consent_status: contact.consent_status || "unknown",
+      consent_source: contact.consent_source || "",
+      consent_note: contact.consent_note || "",
     })
   }
 
@@ -192,14 +211,38 @@ export default function ContactsPage() {
 
   const saveEdit = async (id: string) => {
     const supabase = createClient()
+    const currentContact = contacts.find((contact) => contact.id === id)
     const updates: Partial<Contact> = {}
     if (editValues.first_name !== undefined) updates.first_name = editValues.first_name
     if (editValues.last_name !== undefined) updates.last_name = editValues.last_name || null
     if (editValues.phone !== undefined) updates.phone = editValues.phone
     if (editValues.email !== undefined) updates.email = editValues.email || null
     if (editValues.group_id !== undefined) updates.group_id = editValues.group_id || null
+    if (editValues.consent_status !== undefined) {
+      updates.consent_status = editValues.consent_status
+      updates.consent_source = editValues.consent_status !== "unknown" ? editValues.consent_source || "manual" : null
+      updates.consent_recorded_at = editValues.consent_status !== "unknown" ? new Date().toISOString() : null
+      updates.consent_note = editValues.consent_note || null
+    }
 
     await supabase.from("contacts").update(updates).eq("id", id)
+
+    if (
+      currentContact &&
+      editValues.consent_status !== undefined &&
+      editValues.consent_status !== currentContact.consent_status
+    ) {
+      await recordContactConsentEvent({
+        companyId: currentContact.company_id,
+        contactId: currentContact.id,
+        phone: currentContact.phone,
+        previousStatus: currentContact.consent_status,
+        nextStatus: editValues.consent_status,
+        source: editValues.consent_status !== "unknown" ? editValues.consent_source || "manual" : "manual",
+        note: editValues.consent_note || null,
+      })
+    }
+
     setEditingId(null)
     setEditValues({})
     load()
@@ -227,19 +270,32 @@ export default function ContactsPage() {
       return
     }
 
-    const { error } = await supabase.from("contacts").insert({
+    const { data: insertedContact, error } = await supabase.from("contacts").insert({
       company_id: profile.company_id,
       first_name: firstName.trim(),
       last_name: lastName.trim() || null,
       phone: phone.trim(),
       email: email.trim() || null,
       group_id: groupId || null,
-    })
+      consent_status: consentStatus,
+      consent_source: consentStatus !== "unknown" ? "manual" : null,
+      consent_recorded_at: consentStatus !== "unknown" ? new Date().toISOString() : null,
+    }).select("id, company_id, phone").single()
 
     if (error) {
       toast.error("Kişi eklenemedi")
       setAdding(false)
       return
+    }
+
+    if (consentStatus !== "unknown" && insertedContact) {
+      await recordContactConsentEvent({
+        companyId: insertedContact.company_id,
+        contactId: insertedContact.id,
+        phone: insertedContact.phone,
+        nextStatus: consentStatus,
+        source: "manual",
+      })
     }
 
     toast.success("Kişi eklendi")
@@ -248,6 +304,7 @@ export default function ContactsPage() {
     setPhone("")
     setEmail("")
     setGroupId("")
+    setConsentStatus("unknown")
     setAdding(false)
     setUploadMode("none")
     load()
@@ -299,8 +356,8 @@ export default function ContactsPage() {
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Toplam Kişi" value={contacts.length} description="CRM kayıt sayısı" tone="blue" />
-        <StatCard title="VIP Müşteri" value={vipCount} description="VIP segmentindeki kişi" tone="rose" />
-        <StatCard title="E-postalı Kişi" value={emailCount} description="Çok kanallı iletişim hazır" tone="emerald" />
+        <StatCard title="İzinli Kişi" value={consentedCount} description="Ticari ileti onayı var" tone="emerald" />
+        <StatCard title="İzinsiz Kişi" value={optedOutCount} description="SMS gönderiminden çıkarılır" tone="rose" />
         <StatCard title="Segmentsiz" value={unassignedCount} description="Sınıflandırma bekleyen kayıt" tone="amber" />
       </div>
 
@@ -316,6 +373,14 @@ export default function ContactsPage() {
               <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                 <option value="">Segment yok</option>
                 {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Ticari ileti izni</label>
+              <select value={consentStatus} onChange={(e) => setConsentStatus(e.target.value as ConsentStatus)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                <option value="unknown">Bilinmiyor</option>
+                <option value="opted_in">İzinli</option>
+                <option value="opted_out">İzinsiz</option>
               </select>
             </div>
           </div>
@@ -346,7 +411,16 @@ export default function ContactsPage() {
               {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
           </div>
-          <CsvUpload groupId={csvGroupId || undefined} onComplete={(imported, errors) => {
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">CSV varsayılan ticari ileti izni</label>
+            <select value={csvConsentStatus} onChange={(e) => setCsvConsentStatus(e.target.value as ConsentStatus)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+              <option value="unknown">Bilinmiyor</option>
+              <option value="opted_in">İzinli</option>
+              <option value="opted_out">İzinsiz</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">CSV içinde izin/onay kolonu varsa satırdaki değer önceliklidir.</p>
+          </div>
+          <CsvUpload groupId={csvGroupId || undefined} defaultConsentStatus={csvConsentStatus} onComplete={(imported, errors) => {
             if (errors.length > 0) toast.error(`${errors.length} hata oluştu`)
             toast.success(`${imported} kişi içe aktarıldı`)
             handleCsvComplete()
@@ -355,7 +429,7 @@ export default function ContactsPage() {
       )}
 
       <Card title="CRM Kişi Listesi">
-        <div className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_190px]">
+        <div className="mb-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_190px_190px]">
           <Input
             placeholder="İsim, telefon, e-posta veya segment ile ara..."
             value={search}
@@ -373,6 +447,12 @@ export default function ContactsPage() {
             <option value="new">Yeni kayıt</option>
             <option value="unassigned">Segmentsiz</option>
           </select>
+          <select value={consentFilter} onChange={(e) => setConsentFilter(e.target.value as "all" | ConsentStatus)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+            <option value="all">Tüm izin durumları</option>
+            <option value="opted_in">İzinli</option>
+            <option value="opted_out">İzinsiz</option>
+            <option value="unknown">Bilinmiyor</option>
+          </select>
         </div>
 
         {paged.length > 0 ? (
@@ -384,6 +464,7 @@ export default function ContactsPage() {
                   <Th>Telefon</Th>
                   <Th>E-posta</Th>
                   <Th>Segment</Th>
+                  <Th>İzin</Th>
                   <Th>Etiketler</Th>
                   <Th>Kayıt</Th>
                   <Th></Th>
@@ -413,6 +494,17 @@ export default function ContactsPage() {
                               ))}
                             </select>
                           </Td>
+                          <Td>
+                            <select
+                              value={editValues.consent_status || "unknown"}
+                              onChange={(e) => setEditValues({ ...editValues, consent_status: e.target.value as ConsentStatus })}
+                              className="block w-full rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                            >
+                              <option value="unknown">Bilinmiyor</option>
+                              <option value="opted_in">İzinli</option>
+                              <option value="opted_out">İzinsiz</option>
+                            </select>
+                          </Td>
                           <Td><Input value={editValues.last_name || ""} onChange={(e) => setEditValues({ ...editValues, last_name: e.target.value })} /></Td>
                           <Td>{formatDate(contact.created_at)}</Td>
                           <Td>
@@ -433,6 +525,7 @@ export default function ContactsPage() {
                           <Td className="font-medium text-gray-700">{contact.phone}</Td>
                           <Td>{contact.email || "-"}</Td>
                           <Td>{group ? <StatusBadge label={group.name} tone={group.name.toLowerCase().includes("vip") ? "purple" : "info"} /> : <StatusBadge label="Segmentsiz" tone="neutral" />}</Td>
+                          <Td><StatusBadge label={consentLabel(contact.consent_status)} tone={consentTone(contact.consent_status)} /></Td>
                           <Td>
                             <div className="flex max-w-xs flex-wrap gap-1.5">
                               {tags.slice(0, 3).map((tag) => (
@@ -472,9 +565,9 @@ export default function ContactsPage() {
         ) : (
           <EmptyState
             icon={<span className="text-2xl">Kİ</span>}
-            title={search || groupFilter !== "all" || tagFilter !== "all" ? "Filtreye uygun kişi bulunamadı" : "Kişi bulunamadı"}
+            title={search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" ? "Filtreye uygun kişi bulunamadı" : "Kişi bulunamadı"}
             description="Kişi ekleyerek veya CSV yükleyerek CRM listenizi oluşturmaya başlayın."
-            action={<Button variant="secondary" onClick={search || groupFilter !== "all" || tagFilter !== "all" ? () => { setSearch(""); setGroupFilter("all"); setTagFilter("all") } : () => setUploadMode("single")}>{search || groupFilter !== "all" || tagFilter !== "all" ? "Filtreleri Temizle" : "Kişi Ekle"}</Button>}
+            action={<Button variant="secondary" onClick={search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" ? () => { setSearch(""); setGroupFilter("all"); setTagFilter("all"); setConsentFilter("all") } : () => setUploadMode("single")}>{search || groupFilter !== "all" || tagFilter !== "all" || consentFilter !== "all" ? "Filtreleri Temizle" : "Kişi Ekle"}</Button>}
           />
         )}
       </Card>
