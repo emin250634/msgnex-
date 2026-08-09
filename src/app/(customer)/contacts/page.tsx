@@ -403,6 +403,12 @@ export default function ContactsPage() {
             <p className="mt-2 text-blue-700">
               <strong>phone</strong> ve <strong>first_name</strong> zorunludur. Telefon, gsm, ad, soyad gibi varyasyonlar da algılanır.
             </p>
+            <p className="mt-2 text-blue-700">
+              Dosya önce analiz edilir; hatalı ve tekrar eden satırlar gösterilir. Kayıtlar yalnızca son onaydan sonra içe aktarılır.
+            </p>
+            <p className="mt-2 text-blue-700">
+              Kolonlar otomatik tahmin edilir; gerekirse telefon, ad, soyad, e-posta ve izin kolonlarını elle eşleştirebilirsiniz.
+            </p>
           </div>
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-700">CSV içindeki kişileri segmente ata</label>

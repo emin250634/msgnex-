@@ -157,6 +157,18 @@ Ticari etkisi:
 
 Amaç: MSGNEX'i sadece SMS gönderim paneli değil, müşteri iletişim aracı haline getirmek.
 
+Başlanan işler:
+
+- CSV kişi import akışı sihirbaz mantığına çevrildi:
+  - dosya hemen DB'ye yazılmadan analiz edilir
+  - kolonlar otomatik tahmin edilir
+  - telefon/ad/soyad/e-posta/izin kolonları elle eşleştirilebilir
+  - önizleme gösterilir
+  - hatalı telefon satırları ayrılır
+  - CSV içi tekrar eden telefonlar ayrılır
+  - izinli/izinsiz/bilinmeyen özeti gösterilir
+  - son onaydan sonra içe aktarım yapılır
+
 Yapılacaklar:
 
 - Kişi içe aktarma sihirbazı:
