@@ -228,9 +228,22 @@ Ticari etkisi:
 
 Amaç: MSGNEX'i dış sistemlerle çalışan bir iletişim katmanına çevirmek.
 
+Başlanan işler:
+
+- API dokümantasyonu panel içine taşındı:
+  - endpoint
+  - authorization
+  - idempotency key
+  - örnek request
+  - cURL/JavaScript/PHP örnekleri
+  - örnek response
+  - hata durumları
+  - entegrasyon öncesi kontrol listesi
+  - provider/başlık/kredi notları
+
 Yapılacaklar:
 
-- API dokümantasyonu sayfası.
+- API dokümantasyonunu ayrı geliştirici rehberi sayfasına genişletmek.
 - API key kullanım limitleri.
 - Webhook altyapısı:
   - kampanya tamamlandı

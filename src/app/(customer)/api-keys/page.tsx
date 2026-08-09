@@ -162,14 +162,134 @@ export default function ApiKeysPage() {
       </Card>
 
       <Card title="Örnek API İsteği">
-        <pre className="overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-gray-100">
+        <div className="space-y-5">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+            API gönderimleri firmanızın bağlı Netgsm provider hesabı ve onaylı gönderici başlığı üzerinden yapılır.
+            MSGNEX SMS kredisi satmaz; sağlayıcıdaki kredi firmanızın kendi hesabından kullanılır.
+          </div>
+
+          <div className="grid gap-3 text-sm md:grid-cols-2">
+            <ApiDocItem label="Endpoint" value="POST /api/v1/external/messages" />
+            <ApiDocItem label="Kimlik Doğrulama" value="Authorization: Bearer API_ANAHTARINIZ" />
+            <ApiDocItem label="Idempotency" value="Idempotency-Key zorunludur" />
+            <ApiDocItem label="Limit" value="Tek istekte en fazla 1000 alıcı" />
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-950">Entegrasyon Öncesi Kontrol</p>
+            <div className="grid gap-2 text-sm md:grid-cols-2">
+              <ApiChecklistItem text="Provider bağlantısı aktif olmalı." />
+              <ApiChecklistItem text="Onaylı gönderici başlığı tanımlı olmalı." />
+              <ApiChecklistItem text="Sağlayıcı hesabında yeterli kredi bulunmalı." />
+              <ApiChecklistItem text="Her API isteğinde benzersiz Idempotency-Key gönderilmeli." />
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-950">cURL Örneği</p>
+            <pre className="overflow-x-auto rounded-lg bg-gray-900 p-4 text-xs text-gray-100">
 {`curl -X POST https://app.msgnex.com/api/v1/external/messages \\
   -H "Authorization: Bearer API_ANAHTARINIZ" \\
   -H "Idempotency-Key: crm-order-12345" \\
   -H "Content-Type: application/json" \\
   -d '{"recipients":["905551112233"],"message":"Siparişiniz hazır."}'`}
-        </pre>
+            </pre>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div>
+              <p className="mb-2 text-sm font-semibold text-gray-950">Request Body</p>
+              <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
+{`{
+  "recipients": ["905551112233", "05554443322"],
+  "message": "Siparişiniz hazır."
+}`}
+              </pre>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-semibold text-gray-950">JavaScript fetch</p>
+              <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
+{`await fetch("/api/v1/external/messages", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer API_ANAHTARINIZ",
+    "Idempotency-Key": "crm-order-12345",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    recipients: ["905551112233"],
+    message: "Siparişiniz hazır."
+  })
+})`}
+              </pre>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-semibold text-gray-950">Başarılı Cevap</p>
+              <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
+{`{
+  "campaignId": "uuid",
+  "success": 2,
+  "fail": 0,
+  "pending": 2,
+  "provider": "netgsm",
+  "providerBulkId": "123456"
+}`}
+              </pre>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-950">PHP cURL</p>
+            <pre className="overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs text-gray-700">
+{`$payload = json_encode([
+  "recipients" => ["905551112233"],
+  "message" => "Siparişiniz hazır."
+]);
+
+$ch = curl_init("https://app.msgnex.com/api/v1/external/messages");
+curl_setopt_array($ch, [
+  CURLOPT_POST => true,
+  CURLOPT_HTTPHEADER => [
+    "Authorization: Bearer API_ANAHTARINIZ",
+    "Idempotency-Key: crm-order-12345",
+    "Content-Type: application/json"
+  ],
+  CURLOPT_POSTFIELDS => $payload,
+  CURLOPT_RETURNTRANSFER => true
+]);
+
+$response = curl_exec($ch);`}
+            </pre>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-semibold text-gray-950">Hata Durumları</p>
+            <div className="grid gap-2 text-sm md:grid-cols-2">
+              <ApiDocItem label="401" value="Authorization veya Idempotency-Key eksik" />
+              <ApiDocItem label="400" value="Alıcı, mesaj veya provider hazırlığı geçersiz" />
+              <ApiDocItem label="409" value="Aynı idempotency key ile istek işleniyor" />
+              <ApiDocItem label="500" value="API veya provider sonucu kaydedilemedi" />
+            </div>
+          </div>
+        </div>
       </Card>
+    </div>
+  )
+}
+
+function ApiDocItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
+      <p className="mt-1 font-mono text-sm text-gray-950">{value}</p>
+    </div>
+  )
+}
+
+function ApiChecklistItem({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+      <span className="font-semibold">✓</span> {text}
     </div>
   )
 }
