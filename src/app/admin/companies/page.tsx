@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
+import { PLAN_LABELS } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/client"
 import type { Company } from "@/types"
 
@@ -42,6 +43,7 @@ export default function CompaniesPage() {
     ownerEmail: "",
     phone: "",
     status: "pending_provider_setup",
+    plan: "starter",
   })
 
   const load = async () => {
@@ -71,6 +73,7 @@ export default function CompaniesPage() {
         owner_email: form.ownerEmail,
         phone: form.phone,
         status: form.status,
+        plan: form.plan,
       }),
     })
     const payload = await response.json().catch(() => ({ error: "Firma olusturulamadi" }))
@@ -87,6 +90,7 @@ export default function CompaniesPage() {
       ownerEmail: "",
       phone: "",
       status: "pending_provider_setup",
+      plan: "starter",
     })
     toast.success("Firma olusturuldu ve owner daveti gonderildi")
     load()
@@ -122,7 +126,7 @@ export default function CompaniesPage() {
       />
 
       <Card title="Yeni Firma ve Owner Daveti">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <Input
             label="Firma adi"
             placeholder="Firma adi"
@@ -160,6 +164,18 @@ export default function CompaniesPage() {
               ))}
             </select>
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Plan</label>
+            <select
+              value={form.plan}
+              onChange={(event) => setForm({ ...form, plan: event.target.value })}
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              {Object.entries(PLAN_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <Button className="mt-4" onClick={handleCreate} disabled={saving}>
           {saving ? "Olusturuluyor..." : "Firma Olustur ve Davet Gonder"}
@@ -172,6 +188,7 @@ export default function CompaniesPage() {
             <Tr>
               <Th>Firma</Th>
               <Th>Telefon</Th>
+              <Th>Plan</Th>
               <Th>Durum</Th>
               <Th>Aksiyon</Th>
             </Tr>
@@ -181,6 +198,7 @@ export default function CompaniesPage() {
               <Tr key={company.id}>
                 <Td className="font-medium">{company.name}</Td>
                 <Td>{company.phone || "-"}</Td>
+                <Td>{PLAN_LABELS[company.plan || "starter"]}</Td>
                 <Td>
                   <StatusBadge
                     label={statusLabel(company.status, company.is_active)}

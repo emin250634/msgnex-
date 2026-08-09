@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -11,6 +12,7 @@ import { LoadingState } from "@/components/ui/loading-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
+import { PLAN_LABELS, type CompanyPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/client"
 import type { CustomerApiKey } from "@/types"
 
@@ -29,6 +31,7 @@ async function sha256(value: string): Promise<string> {
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState<CustomerApiKey[]>([])
+  const [plan, setPlan] = useState<{ plan: CompanyPlan; has_api_access: boolean } | null>(null)
   const [name, setName] = useState("")
   const [createdKey, setCreatedKey] = useState("")
   const [loading, setLoading] = useState(true)
@@ -39,12 +42,16 @@ export default function ApiKeysPage() {
     setLoading(true)
     setError("")
     const supabase = createClient()
-    const { data, error: loadError } = await supabase.rpc("list_customer_api_keys")
+    const [{ data, error: loadError }, { data: planRows }] = await Promise.all([
+      supabase.rpc("list_customer_api_keys"),
+      supabase.rpc("get_customer_plan"),
+    ])
     if (loadError) {
       setError(loadError.message)
       toast.error(loadError.message)
     }
     setKeys(data ?? [])
+    setPlan(planRows?.[0] ?? null)
     setLoading(false)
   }
 
@@ -52,6 +59,10 @@ export default function ApiKeysPage() {
 
   const handleCreate = async () => {
     if (!name.trim()) return
+    if (!plan?.has_api_access) {
+      toast.error("API erişimi Profesyonel veya Ajans planı gerektirir.")
+      return
+    }
     setSaving(true)
     const rawKey = generateApiKey()
     const supabase = createClient()
@@ -111,7 +122,7 @@ export default function ApiKeysPage() {
     <div className="space-y-6">
       <PageHeader
         title="API Anahtarları"
-        description="Kendi yazılımınızdan işlemsel SMS göndermek için güvenli API anahtarları oluşturun."
+        description={`Kendi yazılımınızdan işlemsel SMS göndermek için güvenli API anahtarları oluşturun. Mevcut plan: ${plan ? PLAN_LABELS[plan.plan] : "-"}`}
       />
 
       {createdKey && (
@@ -127,9 +138,16 @@ export default function ApiKeysPage() {
       )}
 
       <Card title="Yeni Anahtar Oluştur">
+        {!plan?.has_api_access && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            <p className="font-semibold">API erişimi Profesyonel veya Ajans planında aktiftir.</p>
+            <p>Bu özellik SMS kredisi satışı değildir; dış sistemlerden MSGNEX yazılım katmanına güvenli gönderim yetkisi sağlar.</p>
+            <Link href="/plan" className="mt-2 inline-block font-semibold text-amber-950 underline">Planları incele</Link>
+          </div>
+        )}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <Input label="Anahtar Adı" placeholder="Örn: CRM entegrasyonu" value={name} onChange={(event) => setName(event.target.value)} />
-          <Button onClick={handleCreate} disabled={saving || !name.trim()}>
+          <Button onClick={handleCreate} disabled={saving || !name.trim() || !plan?.has_api_access}>
             {saving ? "Oluşturuluyor..." : "Oluştur"}
           </Button>
         </div>

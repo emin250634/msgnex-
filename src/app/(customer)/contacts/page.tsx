@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
+import { PLAN_LABELS, type CompanyPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/client"
 import { recordContactConsentEvent } from "@/services/contacts"
 import type { Contact, Group } from "@/types"
@@ -98,6 +99,11 @@ export default function ContactsPage() {
   const [adding, setAdding] = useState(false)
   const [csvGroupId, setCsvGroupId] = useState("")
   const [csvConsentStatus, setCsvConsentStatus] = useState<ConsentStatus>("unknown")
+  const [planUsage, setPlanUsage] = useState<{
+    plan: CompanyPlan
+    contact_limit: number
+    current_contacts: number
+  } | null>(null)
 
   const groupMap = useMemo(() => new Map(groups.map((group) => [group.id, group])), [groups])
 
@@ -120,7 +126,7 @@ export default function ContactsPage() {
       return
     }
 
-    const [{ data: contactRows, error: contactError }, { data: groupRows, error: groupError }] = await Promise.all([
+    const [{ data: contactRows, error: contactError }, { data: groupRows, error: groupError }, { data: limitRows }] = await Promise.all([
       supabase
         .from("contacts")
         .select("*")
@@ -131,6 +137,7 @@ export default function ContactsPage() {
         .select("*")
         .eq("company_id", profile.company_id)
         .order("name", { ascending: true }),
+      supabase.rpc("get_customer_plan_limits"),
     ])
 
     if (contactError || groupError) {
@@ -139,6 +146,7 @@ export default function ContactsPage() {
 
     setContacts(contactRows ?? [])
     setGroups(groupRows ?? [])
+    setPlanUsage(limitRows?.[0] ?? null)
     setLoading(false)
   }
 
@@ -172,6 +180,10 @@ export default function ContactsPage() {
   const unassignedCount = contacts.filter((contact) => !contact.group_id).length
   const consentedCount = contacts.filter((contact) => contact.consent_status === "opted_in").length
   const optedOutCount = contacts.filter((contact) => contact.consent_status === "opted_out").length
+  const contactLimit = planUsage?.contact_limit ?? null
+  const currentContactCount = planUsage?.current_contacts ?? contacts.length
+  const remainingContactLimit = contactLimit === null ? undefined : Math.max(0, contactLimit - currentContactCount)
+  const contactLimitReached = typeof remainingContactLimit === "number" && remainingContactLimit <= 0
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 
   const paged = useMemo(() => {
@@ -251,6 +263,10 @@ export default function ContactsPage() {
   const handleAddContact = async () => {
     if (!firstName.trim() || !phone.trim()) {
       toast.error("Ad ve telefon zorunludur")
+      return
+    }
+    if (contactLimitReached) {
+      toast.error("Mevcut plan kişi limitine ulaştı.")
       return
     }
 
@@ -344,18 +360,24 @@ export default function ContactsPage() {
         description="Müşteri kayıtlarını, segmentlerini ve iletişim geçmişini tek CRM görünümünde yönetin."
         actions={
           <>
-            <Button variant={uploadMode === "single" ? "primary" : "secondary"} onClick={() => setUploadMode(uploadMode === "single" ? "none" : "single")}>
+            <Button variant={uploadMode === "single" ? "primary" : "secondary"} disabled={contactLimitReached} onClick={() => setUploadMode(uploadMode === "single" ? "none" : "single")}>
               Kişi Ekle
             </Button>
-            <Button variant={uploadMode === "csv" ? "primary" : "secondary"} onClick={() => setUploadMode(uploadMode === "csv" ? "none" : "csv")}>
+            <Button variant={uploadMode === "csv" ? "primary" : "secondary"} disabled={contactLimitReached} onClick={() => setUploadMode(uploadMode === "csv" ? "none" : "csv")}>
               CSV Yükle
             </Button>
           </>
         }
       />
 
+      {contactLimitReached && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Mevcut plan kişi limitine ulaştı. Daha fazla kişi eklemek için Planım ekranından yükseltme talebi gönderebilirsiniz.
+        </div>
+      )}
+
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Toplam Kişi" value={contacts.length} description="CRM kayıt sayısı" tone="blue" />
+        <StatCard title="Toplam Kişi" value={contacts.length} description={planUsage ? `${PLAN_LABELS[planUsage.plan]} limiti: ${planUsage.contact_limit.toLocaleString("tr-TR")}` : "CRM kayıt sayısı"} tone="blue" />
         <StatCard title="İzinli Kişi" value={consentedCount} description="Ticari ileti onayı var" tone="emerald" />
         <StatCard title="İzinsiz Kişi" value={optedOutCount} description="SMS gönderiminden çıkarılır" tone="rose" />
         <StatCard title="Segmentsiz" value={unassignedCount} description="Sınıflandırma bekleyen kayıt" tone="amber" />
@@ -385,7 +407,7 @@ export default function ContactsPage() {
             </div>
           </div>
           <div className="mt-4">
-            <Button onClick={handleAddContact} disabled={adding || !firstName.trim() || !phone.trim()}>
+            <Button onClick={handleAddContact} disabled={adding || !firstName.trim() || !phone.trim() || contactLimitReached}>
               {adding ? "Ekleniyor..." : "Kişi Ekle"}
             </Button>
           </div>
@@ -426,7 +448,7 @@ export default function ContactsPage() {
             </select>
             <p className="mt-1 text-xs text-gray-500">CSV içinde izin/onay kolonu varsa satırdaki değer önceliklidir.</p>
           </div>
-          <CsvUpload groupId={csvGroupId || undefined} defaultConsentStatus={csvConsentStatus} onComplete={(imported, errors) => {
+          <CsvUpload groupId={csvGroupId || undefined} defaultConsentStatus={csvConsentStatus} remainingLimit={remainingContactLimit} onComplete={(imported, errors) => {
             if (errors.length > 0) toast.error(`${errors.length} hata oluştu`)
             toast.success(`${imported} kişi içe aktarıldı`)
             handleCsvComplete()

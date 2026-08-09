@@ -26,6 +26,7 @@ type IconName =
   | "suppression"
   | "provider"
   | "api"
+  | "webhook"
   | "plan"
   | "companies"
   | "users"
@@ -47,6 +48,7 @@ const customerNav: NavItem[] = [
   { label: "Kara Liste", href: "/suppression", icon: "suppression" },
   { label: "Provider Bağlantısı", href: "/provider", icon: "provider" },
   { label: "API Anahtarları", href: "/api-keys", icon: "api" },
+  { label: "Webhooks", href: "/webhooks", icon: "webhook" },
   { label: "Planım", href: "/plan", icon: "plan" },
 ]
 
@@ -54,6 +56,7 @@ const adminNav: NavItem[] = [
   { label: "Dashboard", href: "/admin/dashboard", icon: "dashboard" },
   { label: "Firmalar", href: "/admin/companies", icon: "companies" },
   { label: "Demo Talepleri", href: "/admin/demo-requests", icon: "demo" },
+  { label: "Plan Talepleri", href: "/admin/plan-requests", icon: "plan" },
   { label: "Kullanıcılar", href: "/admin/users", icon: "users" },
   { label: "Gönderim Kayıtları", href: "/admin/logs", icon: "logs" },
   { label: "Hesap Askıya Alma", href: "/admin/suspension", icon: "suspension" },
@@ -166,6 +169,8 @@ function NavIcon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M4 7h16v12H4z" /><path d="M16 7V5H6" /><circle cx="12" cy="13" r="2" /></svg>
     case "api":
       return <svg {...common}><path d="M8 9 4 12l4 3" /><path d="m16 9 4 3-4 3" /><path d="m14 5-4 14" /></svg>
+    case "webhook":
+      return <svg {...common}><path d="M7 7h4v4H7z" /><path d="M13 13h4v4h-4z" /><path d="M11 9h3a3 3 0 0 1 3 3v1" /><path d="M13 15h-3a3 3 0 0 1-3-3v-1" /><path d="M4 12h3" /><path d="M17 12h3" /></svg>
     case "plan":
       return <svg {...common}><path d="M5 4h14v16H5z" /><path d="M8 8h8" /><path d="M8 12h8" /><path d="M8 16h4" /></svg>
     case "companies":

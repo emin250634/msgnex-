@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { PLAN_LABELS, type CompanyPlan } from "@/lib/plans"
 import { calculateSmsSegments, MAX_SMS_LENGTH } from "@/lib/sms-segments"
 import { createClient } from "@/lib/supabase/client"
 import type { Contact, Group, SmsTemplate } from "@/types"
@@ -36,6 +37,10 @@ export default function SmsPage() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [providerReady, setProviderReady] = useState(false)
   const [providerStatus, setProviderStatus] = useState("Kurulum bekliyor")
+  const [planLimits, setPlanLimits] = useState<{
+    plan: CompanyPlan
+    campaign_recipient_limit: number
+  } | null>(null)
   const [confirmAllContacts, setConfirmAllContacts] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
   const [suppressionPhones, setSuppressionPhones] = useState<string[]>([])
@@ -58,6 +63,7 @@ export default function SmsPage() {
         setProviderStatus(ready ? "Provider hazır" : "Provider kurulumu bekliyor")
       }
     })
+    sb.rpc("get_customer_plan_limits").then(({ data }) => setPlanLimits(data?.[0] ?? null))
   }, [])
 
   const manualRecipients = useMemo(() => manualNumbers
@@ -116,7 +122,8 @@ export default function SmsPage() {
       : groups.find((group) => group.id === selectedGroup)?.name || "Seçili segment"
   const hasAudience = selectedGroup !== NO_SEGMENT || manualRecipients.length > 0
   const requiresAllContactsApproval = selectedGroup === ALL_CONTACTS
-  const canPrepareSend = Boolean(message.trim()) && hasAudience && sendableRecipientCount > 0 && providerReady && (!requiresAllContactsApproval || confirmAllContacts)
+  const recipientLimitExceeded = Boolean(planLimits && sendableRecipientCount > planLimits.campaign_recipient_limit)
+  const canPrepareSend = Boolean(message.trim()) && hasAudience && sendableRecipientCount > 0 && providerReady && !recipientLimitExceeded && (!requiresAllContactsApproval || confirmAllContacts)
 
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplate(id)
@@ -175,6 +182,10 @@ export default function SmsPage() {
     }
     if (requiresAllContactsApproval && !confirmAllContacts) {
       toast.error("Tüm kişilere gönderim için ek onayı işaretleyin")
+      return
+    }
+    if (recipientLimitExceeded && planLimits) {
+      toast.error(`Bu plan tek kampanyada en fazla ${planLimits.campaign_recipient_limit} alıcı destekler.`)
       return
     }
     if (!providerReady) {
@@ -249,6 +260,11 @@ export default function SmsPage() {
 
       <Card title="Alıcılar">
         <div className="space-y-4">
+          {planLimits && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              {PLAN_LABELS[planLimits.plan]} planı tek kampanyada en fazla {planLimits.campaign_recipient_limit.toLocaleString("tr-TR")} net alıcı destekler.
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Segment Seç</label>
             <select
@@ -307,6 +323,11 @@ export default function SmsPage() {
               {manualNumbers ? `${manualRecipients.length} numara algılandı` : "Segment seçmeden manuel numara girerek de devam edebilirsiniz."}
             </p>
           </div>
+          {recipientLimitExceeded && planLimits && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              Seçilen net alıcı sayısı plan limitini aşıyor. Net alıcı: {sendableRecipientCount}, limit: {planLimits.campaign_recipient_limit}.
+            </div>
+          )}
         </div>
       </Card>
 

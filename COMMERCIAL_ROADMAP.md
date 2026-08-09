@@ -270,6 +270,42 @@ Başlanan işler:
 - Panel içine Planım/Paketler sayfası eklendi.
 - SMS kredisi içermeyen yazılım paketi konumlandırması netleştirildi.
 - Başlangıç, Profesyonel ve Ajans/Kurumsal paketleri karşılaştırıldı.
+- Plan yükseltme talebi akışı eklendi:
+  - müşteri Planım ekranından yazılım paketi görüşmesi talep eder
+  - talep SMS kredisi veya sağlayıcı bakiyesi işlemi olarak konumlanmaz
+  - admin panelinde plan talepleri listelenir ve durum takibi yapılır
+- Firma planı atama ve ilk özellik kapıları başlatıldı:
+  - admin firma detayından Başlangıç, Profesyonel veya Ajans/Kurumsal plan atar
+  - müşteri dashboard ve Planım ekranında mevcut planını görür
+  - API anahtarı oluşturma ve external API gönderimi Profesyonel/Ajans planına bağlanır
+- Plan limitleri başlatıldı:
+  - kişi limiti DB trigger ve müşteri UI ile uygulanır
+  - kullanıcı daveti admin API'de plan limitine göre kontrol edilir
+  - SMS gönderiminde tek kampanya net alıcı limiti RPC ve panelde uygulanır
+- Webhook yönetim altyapısı başlatıldı:
+  - Ajans/Kurumsal planına özel webhook kayıt ekranı eklendi
+  - webhook endpoint ve event seçimleri RPC üzerinden yönetilir
+  - signing secret tablo tarafında saklanır, müşteri listeleme çıktısına dönmez
+- Webhook delivery worker başlatıldı:
+  - campaign.completed ve sms.failed olayları delivery kuyruğuna alınır
+  - worker endpoint aktif webhook URL'lerine imzalı POST gönderir
+  - delivery başarı/hata durumu ve retry zamanı kayıt altına alınır
+- Webhook delivery gözlemi eklendi:
+  - müşteri webhook gönderim denemelerini ve son hataları görür
+  - admin firma detayında son webhook delivery denemelerini izler
+  - response status, deneme sayısı ve retry zamanı görünür hale gelir
+- Provider DLR sonuçları webhook eventlerine bağlandı:
+  - record_sms_delivery_event sonrası provider.status_updated event'i kuyruğa alınır
+  - duplicate DLR kayıtları event üretmez
+  - payload içinde mesaj, kampanya, alıcı ve provider durum bilgileri taşınır
+- Webhook test ve manuel retry aksiyonları eklendi:
+  - müşteri seçili webhook için canlı SMS beklemeden test delivery oluşturur
+  - başarılı veya hatalı delivery kayıtları panelden tekrar kuyruğa alınabilir
+  - webhook.test event'i imza ve endpoint doğrulaması için kullanılır
+- Webhook dokümantasyonu güçlendirildi:
+  - delivery payload JSON panelden görüntülenir
+  - imza doğrulama header'ları açıklandı
+  - Node.js ve PHP HMAC SHA-256 doğrulama örnekleri eklendi
 
 Önerilen paketler:
 
@@ -318,7 +354,7 @@ Panel içinde görünmesi gereken net mesajlar:
 5. Kampanya detay raporunu geliştir.
 6. Audit log altyapısını başlat.
 7. API dokümantasyonu sayfası ekle.
-8. Paketleme ve fiyatlandırma sayfası tasarla.
+8. Webhook secret yenileme ve eski secret ile geçiş dönemi desteği ekle.
 
 ## Başarı Kriterleri
 

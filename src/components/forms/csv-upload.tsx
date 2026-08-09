@@ -10,6 +10,7 @@ import type { CsvContactRow } from "@/types"
 interface CsvUploadProps {
   groupId?: string
   defaultConsentStatus?: CsvContactRow["consent_status"]
+  remainingLimit?: number
   onComplete: (imported: number, errors: { row: number; message: string }[]) => void
 }
 
@@ -19,7 +20,7 @@ function consentLabel(value?: CsvContactRow["consent_status"]) {
   return "Bilinmiyor"
 }
 
-export function CsvUpload({ groupId, defaultConsentStatus = "unknown", onComplete }: CsvUploadProps) {
+export function CsvUpload({ groupId, defaultConsentStatus = "unknown", remainingLimit, onComplete }: CsvUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
   const [parseResult, setParseResult] = useState<CsvParseResult | null>(null)
@@ -27,6 +28,7 @@ export function CsvUpload({ groupId, defaultConsentStatus = "unknown", onComplet
   const [mapping, setMapping] = useState<CsvContactMapping>({})
 
   const preview = parseResult?.data.slice(0, 5) ?? []
+  const exceedsLimit = typeof remainingLimit === "number" && Boolean(parseResult?.data.length && parseResult.data.length > remainingLimit)
   const consentCounts = (parseResult?.data ?? []).reduce(
     (acc, row) => {
       const status = row.consent_status || defaultConsentStatus || "unknown"
@@ -114,6 +116,11 @@ export function CsvUpload({ groupId, defaultConsentStatus = "unknown", onComplet
             <CsvMetric label="Hatalı" value={parseResult.errors.length.toString()} tone={parseResult.errors.length > 0 ? "warning" : "neutral"} />
             <CsvMetric label="Tekrar" value={parseResult.duplicates.length.toString()} tone={parseResult.duplicates.length > 0 ? "warning" : "neutral"} />
           </div>
+          {exceedsLimit && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Bu import mevcut plan limitini aşar. Kalan kişi hakkı: {remainingLimit}.
+            </div>
+          )}
 
           <div className="grid gap-3 text-sm sm:grid-cols-3">
             <CsvMetric label="İzinli" value={consentCounts.opted_in.toString()} tone="success" />
@@ -147,7 +154,7 @@ export function CsvUpload({ groupId, defaultConsentStatus = "unknown", onComplet
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button onClick={handleImport} disabled={loading || parseResult.data.length === 0}>
+            <Button onClick={handleImport} disabled={loading || parseResult.data.length === 0 || exceedsLimit}>
               {loading ? "İçe aktarılıyor..." : `${parseResult.data.length} Kişiyi İçe Aktar`}
             </Button>
             <Button variant="secondary" onClick={reset} disabled={loading}>

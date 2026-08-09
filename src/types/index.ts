@@ -19,6 +19,7 @@ export interface Company {
   phone: string | null
   address: string | null
   status: "pending_review" | "pending_provider_setup" | "active" | "suspended" | "rejected"
+  plan: "starter" | "professional" | "agency"
   is_active: boolean
   sender_name: string
   sender_approved: boolean
@@ -231,6 +232,36 @@ export interface DemoRequest {
   rejection_reason: string | null
   last_email_sent_at: string | null
   last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyWebhook {
+  id: string
+  endpoint_url: string
+  events: string[]
+  is_active: boolean
+  last_delivery_status: "pending" | "success" | "failed" | null
+  last_delivery_error: string | null
+  last_delivered_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WebhookDelivery {
+  id: string
+  webhook_id: string
+  endpoint_url: string
+  event_type: string
+  payload: unknown
+  status: "queued" | "processing" | "success" | "failed"
+  attempts: number
+  max_attempts: number
+  next_attempt_at: string
+  delivered_at: string | null
+  response_status: number | null
+  response_body: string | null
+  error: string | null
   created_at: string
   updated_at: string
 }

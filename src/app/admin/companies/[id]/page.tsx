@@ -12,6 +12,7 @@ import { LoadingState } from "@/components/ui/loading-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { PLAN_LABELS, PLAN_LIMITS, type CompanyPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/client"
 import type { Company } from "@/types"
 
@@ -67,6 +68,25 @@ interface CompanyUserRow {
   accepted_at: string | null
   invitation_status: string
   last_sign_in_at: string | null
+}
+
+interface CompanyWebhookRow {
+  id: string
+  endpoint_url: string
+  events: string[]
+  is_active: boolean
+  last_delivery_status: string | null
+  created_at: string
+}
+
+interface CompanyWebhookDeliveryRow {
+  id: string
+  event_type: string
+  status: string
+  attempts: number
+  response_status: number | null
+  error: string | null
+  created_at: string
 }
 
 function formatDate(value?: string | null) {
@@ -130,6 +150,8 @@ export default function AdminCompanyDetailPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [providerData, setProviderData] = useState<ProviderSettingsResponse | null>(null)
   const [companyUsers, setCompanyUsers] = useState<CompanyUserRow[]>([])
+  const [companyWebhooks, setCompanyWebhooks] = useState<CompanyWebhookRow[]>([])
+  const [webhookDeliveries, setWebhookDeliveries] = useState<CompanyWebhookDeliveryRow[]>([])
   const [form, setForm] = useState<ProviderFormState>({
     usercode: "",
     secret: "",
@@ -141,6 +163,7 @@ export default function AdminCompanyDetailPage() {
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [providerAction, setProviderAction] = useState<"test_connection" | "query_headers" | "query_credit" | null>(null)
@@ -156,10 +179,21 @@ export default function AdminCompanyDetailPage() {
     setError("")
 
     const supabase = createClient()
-    const [{ data: companyData }, providerResponse, usersResponse] = await Promise.all([
+    const [{ data: companyData }, providerResponse, usersResponse, { data: webhookRows }, { data: deliveryRows }] = await Promise.all([
       supabase.from("companies").select("*").eq("id", params.id).maybeSingle(),
       fetch(`/api/admin/companies/${params.id}/provider-settings`),
       fetch(`/api/admin/companies/${params.id}/users`),
+      supabase
+        .from("company_webhooks")
+        .select("id, endpoint_url, events, is_active, last_delivery_status, created_at")
+        .eq("company_id", params.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("webhook_deliveries")
+        .select("id, event_type, status, attempts, response_status, error, created_at")
+        .eq("company_id", params.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
     ])
 
     if (!companyData) {
@@ -183,6 +217,8 @@ export default function AdminCompanyDetailPage() {
       const usersPayload = await usersResponse.json() as { users: CompanyUserRow[] }
       setCompanyUsers(usersPayload.users)
     }
+    setCompanyWebhooks((webhookRows ?? []) as CompanyWebhookRow[])
+    setWebhookDeliveries((deliveryRows ?? []) as CompanyWebhookDeliveryRow[])
     setLoading(false)
   }
 
@@ -195,6 +231,10 @@ export default function AdminCompanyDetailPage() {
   const wallet = providerData?.wallet
   const senderHeaders = providerData?.sender_headers ?? []
   const hasProviderRecord = Boolean(settings?.created_at)
+  const companyPlan = company?.plan || "starter"
+  const planLimits = PLAN_LIMITS[companyPlan]
+  const activeUserCount = companyUsers.filter((user) => user.is_active).length
+  const userLimitReached = activeUserCount >= planLimits.users
 
   const providerHealth = useMemo(() => {
     if (!settings?.is_active) return { label: "Hazır değil", tone: "warning" as const }
@@ -243,6 +283,26 @@ export default function AdminCompanyDetailPage() {
     setProviderData(nextData)
     setForm(formFromSettings(nextData))
     toast.success("Provider ayarları kaydedildi")
+  }
+
+  const handlePlanSave = async (plan: CompanyPlan) => {
+    if (!company || company.plan === plan) return
+    setSavingPlan(true)
+    const response = await fetch(`/api/admin/companies/${params.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan }),
+    })
+    const payload = await response.json().catch(() => ({ error: "Firma planı güncellenemedi" }))
+    setSavingPlan(false)
+
+    if (!response.ok) {
+      toast.error(payload.error || "Firma planı güncellenemedi")
+      return
+    }
+
+    setCompany(payload.company)
+    toast.success(payload.message || "Firma planı güncellendi")
   }
 
   const runProviderAction = async (action: "test_connection" | "query_headers" | "query_credit") => {
@@ -379,11 +439,84 @@ export default function AdminCompanyDetailPage() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Plan" value={PLAN_LABELS[company.plan || "starter"]} description="Yazılım paketi" tone="blue" icon={<span className="font-semibold">PL</span>} />
         <StatCard title="Sağlayıcı" value={settings?.encoding === "TEST" ? "Test Provider" : hasProviderRecord ? "Netgsm" : "Henüz bağlanmadı"} description="Firma bazlı provider" tone="slate" icon={<span className="font-semibold">NG</span>} />
         <StatCard title="Bağlantı" value={connectionLabel(settings?.connection_status)} description="Test bağlantısı bu fazda yok" tone={settings?.connection_status === "connected" ? "emerald" : "amber"} icon={<span className="font-semibold">API</span>} />
         <StatCard title="Netgsm Kredi Durumu" value={wallet ? wallet.balance.toLocaleString("tr-TR") : "-"} description={wallet ? `${wallet.balance_unit || "sms"} / ${wallet.currency || "TRY"}` : "Henüz sorgulanmadı"} tone="slate" icon={<span className="font-semibold">₺</span>} />
-        <StatCard title="Provider Sağlığı" value={providerHealth.label} description="Connected test yapılmadan hazır sayılmaz" tone={providerHealth.tone === "success" ? "emerald" : "amber"} icon={<span className="font-semibold">ST</span>} />
       </div>
+
+      <Card title="Firma Planı">
+        <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Atanan plan</label>
+            <select
+              value={company.plan || "starter"}
+              disabled={savingPlan}
+              onChange={(event) => handlePlanSave(event.target.value as CompanyPlan)}
+              className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              {Object.entries(PLAN_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <p className="mt-3 text-sm leading-6 text-gray-500">
+              Plan değişikliği SMS kredisi oluşturmaz. Sadece MSGNEX yazılım özelliklerini açar veya sınırlar.
+            </p>
+          </div>
+          <div className="grid gap-3 text-sm sm:grid-cols-3">
+            <PlanFeatureBox title="API" enabled={company.plan === "professional" || company.plan === "agency"} />
+            <PlanFeatureBox title="Audit Log" enabled={company.plan === "professional" || company.plan === "agency"} />
+            <PlanFeatureBox title="Webhook" enabled={company.plan === "agency"} />
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 text-sm md:grid-cols-3">
+          <LimitBox title="Kullanıcı" value={`${activeUserCount} / ${planLimits.users}`} />
+          <LimitBox title="Kişi" value={planLimits.contacts.toLocaleString("tr-TR")} />
+          <LimitBox title="Kampanya Alıcısı" value={`Tek seferde ${planLimits.campaignRecipients.toLocaleString("tr-TR")}`} />
+        </div>
+      </Card>
+
+      <Card title="Webhook Durumu">
+        {companyWebhooks.length > 0 ? (
+          <div className="space-y-3">
+            {companyWebhooks.map((webhook) => (
+              <div key={webhook.id} className="flex flex-col gap-3 rounded-lg border border-gray-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="break-all font-mono text-sm font-semibold text-gray-950">{webhook.endpoint_url}</p>
+                  <p className="mt-1 text-xs text-gray-500">{webhook.events.join(", ")}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge label={webhook.is_active ? "Aktif" : "Pasif"} tone={webhook.is_active ? "success" : "neutral"} />
+                  <StatusBadge label={webhook.last_delivery_status || "Henüz delivery yok"} tone={webhook.last_delivery_status === "success" ? "success" : webhook.last_delivery_status === "failed" ? "danger" : "warning"} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+            Bu firmada tanımlı webhook yok.
+          </div>
+        )}
+        {webhookDeliveries.length > 0 && (
+          <div className="mt-5 border-t border-gray-100 pt-5">
+            <p className="mb-3 text-sm font-semibold text-gray-950">Son Delivery Denemeleri</p>
+            <div className="space-y-2">
+              {webhookDeliveries.map((delivery) => (
+                <div key={delivery.id} className="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge label={delivery.status} tone={delivery.status === "success" ? "success" : delivery.status === "failed" ? "danger" : "warning"} />
+                    <span className="font-mono text-xs text-gray-600">{delivery.event_type}</span>
+                    {delivery.response_status && <span className="text-xs text-gray-500">HTTP {delivery.response_status}</span>}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {delivery.attempts} deneme · {new Date(delivery.created_at).toLocaleString("tr-TR")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-5">
@@ -539,6 +672,11 @@ export default function AdminCompanyDetailPage() {
         <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
           Firma kullanıcıları Supabase davet akışıyla şifrelerini kendileri belirler. Admin kullanıcı şifresini göremez.
         </div>
+        {userLimitReached && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Bu firma {PLAN_LABELS[companyPlan]} planındaki aktif kullanıcı limitine ulaştı. Yeni kullanıcı eklemek için planı yükseltin.
+          </div>
+        )}
 
         <div className="mb-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px_auto]">
           <Input
@@ -567,7 +705,7 @@ export default function AdminCompanyDetailPage() {
             </select>
           </div>
           <div className="flex items-end">
-            <Button onClick={handleInvite} disabled={inviting}>
+            <Button onClick={handleInvite} disabled={inviting || userLimitReached}>
               {inviting ? "Gönderiliyor..." : "Davet Et"}
             </Button>
           </div>
@@ -786,6 +924,24 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4">
       <span className="text-gray-500">{label}</span>
       <span className="text-right font-semibold text-gray-950">{value}</span>
+    </div>
+  )
+}
+
+function PlanFeatureBox({ title, enabled }: { title: string; enabled: boolean }) {
+  return (
+    <div className={enabled ? "rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-emerald-900" : "rounded-lg border border-gray-200 bg-gray-50 p-4 text-gray-500"}>
+      <p className="font-semibold">{title}</p>
+      <p className="mt-2 text-xs">{enabled ? "Aktif" : "Kapalı"}</p>
+    </div>
+  )
+}
+
+function LimitBox({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-900">
+      <p className="text-xs font-semibold uppercase text-slate-500">{title}</p>
+      <p className="mt-2 font-semibold">{value}</p>
     </div>
   )
 }

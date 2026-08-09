@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { getResetPasswordRedirectUrl } from "@/lib/utils/app-url"
+import { PLAN_LIMITS, isCompanyPlan, type CompanyPlan } from "@/lib/plans"
 
 const COMPANY_ROLES = ["company_owner", "company_admin", "company_user"]
 
@@ -17,7 +18,7 @@ function validationError(message: string) {
 async function ensureCompany(adminClient: any, companyId: string) {
   return adminClient
     .from("companies")
-    .select("id")
+    .select("id, plan")
     .eq("id", companyId)
     .maybeSingle()
 }
@@ -97,6 +98,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (!email || !email.includes("@")) return validationError("Geçerli e-posta zorunludur")
     if (!fullName) return validationError("Ad soyad zorunludur")
     if (!COMPANY_ROLES.includes(role)) return validationError("Rol geçersiz")
+
+    const companyPlan: CompanyPlan = isCompanyPlan(String(company.plan)) ? company.plan : "starter"
+    const userLimit = PLAN_LIMITS[companyPlan].users
+    const { count: currentUsers, error: countError } = await adminClient
+      .from("company_users")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", params.id)
+      .eq("is_active", true)
+
+    if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
+    if ((currentUsers ?? 0) >= userLimit) {
+      return validationError(`Bu plan en fazla ${userLimit} aktif kullanıcı destekler.`)
+    }
 
     const invite = await adminClient.auth.admin.inviteUserByEmail(email, {
       data: {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { getResetPasswordRedirectUrl } from "@/lib/utils/app-url"
+import { isCompanyPlan } from "@/lib/plans"
 
 const OWNER_ROLE = "company_owner"
 
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
     const ownerEmail = String(body.owner_email ?? "").trim().toLowerCase()
     const phone = String(body.phone ?? "").trim() || null
     const status = String(body.status ?? "pending_provider_setup").trim()
+    const plan = String(body.plan ?? "starter").trim()
 
     if (!companyName) return validationError("Firma adı zorunludur")
     if (!ownerName) return validationError("Yetkili adı zorunludur")
@@ -27,6 +29,7 @@ export async function POST(request: NextRequest) {
     if (!["pending_review", "pending_provider_setup", "active", "suspended", "rejected"].includes(status)) {
       return validationError("Firma durumu geçersiz")
     }
+    if (!isCompanyPlan(plan)) return validationError("Firma planı geçersiz")
 
     const { data: company, error: companyError } = await adminClient
       .from("companies")
@@ -34,6 +37,7 @@ export async function POST(request: NextRequest) {
         name: companyName,
         phone,
         status,
+        plan,
         is_active: status !== "suspended" && status !== "rejected",
         sender_name: "",
         sender_approved: false,

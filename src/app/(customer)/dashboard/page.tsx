@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { PageHeader } from "@/components/ui/page-header"
 import { StatCard } from "@/components/ui/stat-card"
 import { StatusBadge } from "@/components/ui/status-badge"
+import { PLAN_LABELS, type CompanyPlan } from "@/lib/plans"
 import { createClient } from "@/lib/supabase/server"
 
 function formatDate(value?: string | null) {
@@ -89,6 +90,7 @@ export default async function CustomerDashboard() {
   const activeCompanyId = activeMembership?.company_id
 
   let companyName = "-"
+  let companyPlan: CompanyPlan = "starter"
   let providerName = "Netgsm"
   let providerStatus = "Kurulum bekliyor"
   let providerReady = false
@@ -107,10 +109,11 @@ export default async function CustomerDashboard() {
   if (activeCompanyId) {
     const { data: company } = await supabase
       .from("companies")
-      .select("name")
+      .select("name, plan")
       .eq("id", activeCompanyId)
       .single()
     companyName = company?.name || "-"
+    companyPlan = (company?.plan as CompanyPlan | null) || "starter"
 
     const { data: providerRows } = await supabase.rpc("get_customer_provider_status")
     const provider = providerRows?.[0]
@@ -229,10 +232,10 @@ export default async function CustomerDashboard() {
       </div>
 
       <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
+        <StatCard title="Plan" value={PLAN_LABELS[companyPlan]} description="Yazılım paketi" tone="slate" icon={<span className="font-semibold">PL</span>} trend={<MiniTrend tone="purple" />} />
         <StatCard title="Provider" value={providerName} description={providerStatus} tone="blue" icon={<span className="font-semibold">API</span>} trend={<MiniTrend tone="blue" />} />
         <StatCard title="Kişiler" value={contactCount} description="Toplam kayıtlı kişi" tone="emerald" icon={<span className="font-semibold">KŞ</span>} trend={<MiniTrend tone="green" />} />
         <StatCard title="Kampanyalar" value={campaignCount} description="Toplam kampanya" tone="slate" icon={<span className="font-semibold">KP</span>} trend={<MiniTrend tone="purple" />} />
-        <StatCard title="Teslimat Oranı" value={`%${successRate}`} description="Son kayıtlar üzerinden özet" tone="amber" icon={<span className="font-semibold">OK</span>} trend={<MiniTrend tone="orange" />} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -246,7 +249,7 @@ export default async function CustomerDashboard() {
           <StatusMetric title="DLR Bekleyen" value={awaitingDlrCount} description="Teslimat raporu bekleyen" tone="red" />
           <StatusMetric title="Provider Hatası" value={providerFailedCount} description="Hata alan kampanyalar" tone="orange" />
           <StatusMetric title="İnceleme Gereken" value={reviewRequiredCount} description="Operasyon kontrolü gereken" tone="violet" />
-          <StatusMetric title="Sistem Sağlığı" value="Hazır" description="Panel akışı aktif, provider ayarı bekleniyor" tone="emerald" />
+          <StatusMetric title="Teslimat Oranı" value={`%${successRate}`} description="Son kayıtlar üzerinden özet" tone="emerald" />
         </div>
       </Card>
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { writeAuditLog } from "@/lib/audit-log"
+import { isCompanyPlan } from "@/lib/plans"
 
 interface RouteContext {
   params: {
@@ -53,6 +54,61 @@ async function deleteUserIfOrphan(adminClient: any, userId: string, deletedCompa
         })
         .eq("id", userId)
     }
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  try {
+    const auth = await requireAdminAuth()
+    if (!auth.ok) return auth.response
+
+    const { adminClient, profile, userId } = auth.context
+    const body = await request.json().catch(() => ({}))
+    const plan = String(body.plan ?? "").trim()
+
+    if (!isCompanyPlan(plan)) {
+      return NextResponse.json({ error: "Firma planı geçersiz" }, { status: 400 })
+    }
+
+    const { data: currentCompany, error: currentError } = await adminClient
+      .from("companies")
+      .select("id, plan")
+      .eq("id", params.id)
+      .maybeSingle()
+
+    if (currentError) return NextResponse.json({ error: currentError.message }, { status: 500 })
+    if (!currentCompany) return NextResponse.json({ error: "Firma bulunamadi" }, { status: 404 })
+
+    const { data: company, error: updateError } = await adminClient
+      .from("companies")
+      .update({ plan })
+      .eq("id", params.id)
+      .select("*")
+      .maybeSingle()
+
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    if (!company) return NextResponse.json({ error: "Firma bulunamadi" }, { status: 404 })
+
+    await writeAuditLog({
+      adminClient,
+      actorUserId: userId,
+      actorRole: profile.role,
+      action: "company.plan.update",
+      targetType: "company",
+      targetId: params.id,
+      companyId: params.id,
+      metadata: {
+        previous_plan: currentCompany.plan ?? "starter",
+        next_plan: plan,
+      },
+    })
+
+    return NextResponse.json({ company, message: "Firma planı güncellendi" })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { status: 500 }
+    )
   }
 }
 
