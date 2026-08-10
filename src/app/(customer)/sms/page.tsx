@@ -31,6 +31,10 @@ function normalizePhone(phone: string): string {
   return digits
 }
 
+function formatNumber(value: number) {
+  return value.toLocaleString("tr-TR")
+}
+
 export default function SmsPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [groups, setGroups] = useState<Group[]>([])
@@ -143,8 +147,10 @@ export default function SmsPage() {
   const suppressedRecipientCount = suppressedRecipients.length
   const optedOutRecipientCount = optedOutRecipients.length
   const unknownConsentRecipientCount = unknownConsentRecipients.length
+  const skippedRecipientCount = suppressedRecipientCount + optedOutRecipientCount
   const segmentInfo = calculateSmsSegments(message)
   const cost = sendableRecipientCount * segmentInfo.segments
+  const sendableRate = recipientCount > 0 ? Math.round((sendableRecipientCount / recipientCount) * 100) : 0
   const selectedGroupName = selectedGroup === ALL_CONTACTS
     ? "Tüm Kişiler"
     : selectedGroup === NO_SEGMENT
@@ -425,13 +431,16 @@ export default function SmsPage() {
       </Card>
 
       <Card title="Gönderim Öncesi Özet">
-        <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-6">
-          <SummaryItem label="Seçilen alıcı" value={recipientCount.toString()} />
-          <SummaryItem label="Gönderilecek" value={sendableRecipientCount.toString()} />
-          <SummaryItem label="Kara listede atlanacak" value={suppressedRecipientCount.toString()} emphasize={suppressedRecipientCount > 0} />
-          <SummaryItem label="İzinsiz atlanacak" value={optedOutRecipientCount.toString()} emphasize={optedOutRecipientCount > 0} />
-          <SummaryItem label="Tahmini sağlayıcı kredi kullanımı" value={`${cost} SMS parçası`} />
-          <SummaryItem label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
+        <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-4">
+          <SummaryItem label="Seçilen alıcı" value={formatNumber(recipientCount)} hint={selectedGroupName} />
+          <SummaryItem label="Net gönderilecek" value={formatNumber(sendableRecipientCount)} hint={`Uygun alıcı oranı %${sendableRate}`} tone="success" />
+          <SummaryItem label="Atlanacak alıcı" value={formatNumber(skippedRecipientCount)} hint={`${suppressedRecipientCount} kara liste, ${optedOutRecipientCount} izinsiz`} tone={skippedRecipientCount > 0 ? "warning" : "neutral"} />
+          <SummaryItem label="Tahmini kullanım" value={formatNumber(cost)} hint={`${segmentInfo.segments} parça x ${formatNumber(sendableRecipientCount)} alıcı`} tone="info" />
+        </div>
+        <div className="mt-4 grid gap-4 text-sm md:grid-cols-3">
+          <SummaryItem label="Mesaj uzunluğu" value={`${message.length}/${MAX_SMS_LENGTH}`} hint={`${segmentInfo.encoding} kodlama`} />
+          <SummaryItem label="SMS parça sayısı" value={`${segmentInfo.segments} parça`} hint="Sağlayıcı hesabınızdan buna göre düşer" />
+          <SummaryItem label="İzin durumu bilinmeyen" value={formatNumber(unknownConsentRecipientCount)} hint="Bilinmeyenler gönderime dahil edilir" tone={unknownConsentRecipientCount > 0 ? "warning" : "neutral"} />
         </div>
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
           <RiskCheck label="Provider başlığı" value={senderId || "Tanımlı değil"} ok={providerReady && Boolean(senderId)} />
@@ -439,10 +448,14 @@ export default function SmsPage() {
           <RiskCheck label="Kara liste kontrolü" value={suppressedRecipientCount > 0 ? `${suppressedRecipientCount} numara atlanacak` : "Atlanacak numara yok"} ok={suppressedRecipientCount === 0} />
           <RiskCheck label="Gönderim zamanı" value="Hemen / kuyruğa alınacak" ok />
           <RiskCheck label="Segment / kaynak" value={selectedGroupName} ok />
+          <RiskCheck label="Plan limiti" value={planLimits ? `${formatNumber(sendableRecipientCount)} / ${formatNumber(planLimits.campaign_recipient_limit)} net alıcı` : "Plan limiti yükleniyor"} ok={!recipientLimitExceeded} />
         </div>
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <p className="text-xs font-semibold uppercase text-gray-500">Mesaj önizleme</p>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{message || "Mesaj içeriği henüz girilmedi."}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase text-gray-500">Mesaj önizleme</p>
+            <StatusBadge label={`${segmentInfo.segments} SMS parçası`} tone={segmentInfo.segments > 1 ? "warning" : "info"} />
+          </div>
+          <p className="mt-3 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-sm leading-6 text-gray-700">{message || "Mesaj içeriği henüz girilmedi."}</p>
         </div>
       </Card>
 
@@ -450,17 +463,23 @@ export default function SmsPage() {
         <Card title="Son Onay">
           <div className="space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-              <p className="text-lg font-semibold text-blue-950">{sendableRecipientCount} kişiye SMS gönderilecek</p>
+              <p className="text-lg font-semibold text-blue-950">{formatNumber(sendableRecipientCount)} kişiye SMS gönderilecek</p>
               <p className="mt-1">
-                Tahmini {cost} SMS parçası firmanızın sağlayıcı hesabındaki krediden kullanılacak.
+                Tahmini {formatNumber(cost)} SMS parçası firmanızın sağlayıcı hesabındaki krediden kullanılacak.
                 {suppressedRecipientCount > 0 ? ` ${suppressedRecipientCount} kara listedeki numara gönderimden çıkarılacak.` : ""}
                 {optedOutRecipientCount > 0 ? ` ${optedOutRecipientCount} izinsiz numara gönderimden çıkarılacak.` : ""}
                 {" "}Kampanya kuyruğa alınır.
               </p>
             </div>
+            <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+              <ConfirmMetric label="Gönderici başlığı" value={senderId || "-"} />
+              <ConfirmMetric label="Alıcı kaynağı" value={selectedGroupName} />
+              <ConfirmMetric label="Mesaj parçası" value={`${segmentInfo.segments} parça`} />
+              <ConfirmMetric label="Atlanan alıcı" value={formatNumber(skippedRecipientCount)} />
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button onClick={handleSend} disabled={loading}>
-                {loading ? "Gönderiliyor..." : `${sendableRecipientCount} Kişiye SMS Gönder`}
+                {loading ? "Gönderiliyor..." : `${formatNumber(sendableRecipientCount)} Kişiye SMS Gönder`}
               </Button>
               <Button variant="secondary" onClick={() => setShowFinalConfirm(false)} disabled={loading}>Geri Dön</Button>
             </div>
@@ -483,11 +502,38 @@ export default function SmsPage() {
   )
 }
 
-function SummaryItem({ label, value, emphasize = false }: { label: string; value: string; emphasize?: boolean }) {
+function SummaryItem({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+}: {
+  label: string
+  value: string
+  hint?: string
+  tone?: "neutral" | "success" | "warning" | "info"
+}) {
+  const valueClass = {
+    neutral: "text-gray-950",
+    success: "text-emerald-700",
+    warning: "text-amber-700",
+    info: "text-blue-700",
+  }[tone]
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4">
       <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
-      <p className={emphasize ? "mt-2 text-lg font-semibold text-red-700" : "mt-2 text-lg font-semibold text-gray-950"}>{value}</p>
+      <p className={`mt-2 text-2xl font-semibold ${valueClass}`}>{value}</p>
+      {hint && <p className="mt-1 text-xs leading-5 text-gray-500">{hint}</p>}
+    </div>
+  )
+}
+
+function ConfirmMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-gray-950">{value}</p>
     </div>
   )
 }

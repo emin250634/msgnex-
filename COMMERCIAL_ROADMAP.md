@@ -173,6 +173,13 @@ Başlanan işler:
 - Şablon kategorileri başlatıldı:
   - SMS şablonları genel, kampanya, duyuru, randevu, ödeme ve destek kategorilerine ayrılabilir
   - SMS gönder ekranında şablon seçimi kategori etiketiyle gösterilir
+- Gönderim öncesi önizleme güçlendirildi:
+  - net gönderilecek alıcı, atlanacak kişi ve tahmini sağlayıcı kullanımı daha görünür hale getirildi
+  - mesaj uzunluğu, SMS parça sayısı ve izin durumu bilinmeyen alıcılar ayrı gösterilir
+  - son onay alanında gönderici başlığı, alıcı kaynağı, parça sayısı ve atlanan alıcı özeti yer alır
+- Başarısız alıcı temizliği görünür hale getirildi:
+  - kampanya raporunda başarısız alıcılar için CSV, CRM filtresi, segment ve kara liste aksiyonları ayrı kartlara ayrıldı
+  - tekil başarısız numara ve kara liste adayı sayıları rapor üzerinde gösterilir
 
 Yapılacaklar:
 
@@ -187,8 +194,6 @@ Yapılacaklar:
   - son gönderim tarihi bazlı
   - kara listede olmayanlar
 - Kampanya taslakları.
-- Gönderim öncesi önizleme.
-- Başarısız numaraları ayrı listeye aktarma.
 
 Ticari etkisi:
 

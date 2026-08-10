@@ -635,6 +635,10 @@ export default function CampaignsPage() {
     () => detailMessages.filter((message) => message.status === "failed" || Boolean(message.provider_error)),
     [detailMessages]
   )
+  const failedUniqueRecipientCount = useMemo(
+    () => new Set(failedDetailMessages.map((message) => normalizePhoneForCompare(message.recipient)).filter(Boolean)).size,
+    [failedDetailMessages]
+  )
   const suppressionCandidateMessages = useMemo(
     () => failedDetailMessages.filter(isSuppressionCandidate),
     [failedDetailMessages]
@@ -1221,28 +1225,46 @@ export default function CampaignsPage() {
 
               {failedDetailMessages.length > 0 && (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-red-950">Başarısız Alıcı Listesi</p>
+                      <p className="text-sm font-semibold text-red-950">Başarısız Alıcı Temizliği</p>
                       <p className="mt-1 text-sm leading-6 text-red-800">
-                        {failedDetailMessages.length} başarısız kayıt ayrı CSV olarak indirilebilir. Bu liste kişi temizliği veya destek incelemesi için kullanılabilir.
-                        {suppressionCandidateMessages.length > 0 ? ` ${suppressionCandidateMessages.length} kayıt kara liste adayı.` : ""}
+                        {failedDetailMessages.length} başarısız kayıt içinde {failedUniqueRecipientCount} tekil numara var.
+                        Bu alanı destek incelemesi, CRM temizliği, segmentleme veya kara liste akışı için kullanabilirsiniz.
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" onClick={exportFailedRecipientsCsv} disabled={detailLoading}>
-                        Başarısızları CSV İndir
-                      </Button>
-                      <Button variant="secondary" onClick={openFailedRecipientsInContacts} disabled={detailLoading}>
-                        Kişilerde Temizle
-                      </Button>
-                      <Button variant="secondary" onClick={openFailedRecipientsSegmentModal} disabled={detailLoading}>
-                        Segmente Aktar
-                      </Button>
-                      <Button onClick={addFailedRecipientsToSuppression} disabled={detailLoading || suppressionCandidateMessages.length === 0}>
-                        Kara Listeye Ekle
-                      </Button>
-                    </div>
+                    <StatusBadge label={`${suppressionCandidateMessages.length} kara liste adayı`} tone={suppressionCandidateMessages.length > 0 ? "warning" : "neutral"} />
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <CleanupAction
+                      title="CSV indir"
+                      description="Destek ekibi veya dış temizlik için başarısız alıcıları dosya olarak alın."
+                      action="CSV İndir"
+                      onClick={exportFailedRecipientsCsv}
+                      disabled={detailLoading}
+                    />
+                    <CleanupAction
+                      title="CRM'de filtrele"
+                      description="Eşleşen kişi kayıtlarını Kişiler ekranında açıp manuel kontrol edin."
+                      action="Kişilerde Aç"
+                      onClick={openFailedRecipientsInContacts}
+                      disabled={detailLoading}
+                    />
+                    <CleanupAction
+                      title="Segmente aktar"
+                      description="Eşleşen kişileri yeni veya mevcut bir segmente taşıyın."
+                      action="Segment Seç"
+                      onClick={openFailedRecipientsSegmentModal}
+                      disabled={detailLoading}
+                    />
+                    <CleanupAction
+                      title="Kara listeye ekle"
+                      description="Numara formatı veya provider hatası olan adayları sonraki gönderimlerden çıkarın."
+                      action="Kara Listeye Ekle"
+                      onClick={addFailedRecipientsToSuppression}
+                      disabled={detailLoading || suppressionCandidateMessages.length === 0}
+                      primary
+                    />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {failedDetailMessages.slice(0, 8).map((message) => (
@@ -1365,7 +1387,9 @@ export default function CampaignsPage() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <CancelMetric label="Başarısız alıcı" value={`${failedDetailMessages.length} kayıt`} />
+                <CancelMetric label="Tekil numara" value={`${failedUniqueRecipientCount} numara`} />
                 <CancelMetric label="Kampanya" value={detailTarget.name || detailTarget.id.slice(0, 8)} />
+                <CancelMetric label="Kara liste adayı" value={`${suppressionCandidateMessages.length} kayıt`} />
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -1380,6 +1404,34 @@ export default function CampaignsPage() {
           </Card>
         </div>
       )}
+    </div>
+  )
+}
+
+function CleanupAction({
+  title,
+  description,
+  action,
+  onClick,
+  disabled = false,
+  primary = false,
+}: {
+  title: string
+  description: string
+  action: string
+  onClick: () => void
+  disabled?: boolean
+  primary?: boolean
+}) {
+  return (
+    <div className="flex h-full flex-col justify-between rounded-xl border border-red-100 bg-white p-4">
+      <div>
+        <p className="text-sm font-semibold text-gray-950">{title}</p>
+        <p className="mt-2 text-xs leading-5 text-gray-600">{description}</p>
+      </div>
+      <Button className="mt-4 w-full" variant={primary ? "primary" : "secondary"} size="sm" onClick={onClick} disabled={disabled}>
+        {action}
+      </Button>
     </div>
   )
 }
