@@ -9,10 +9,37 @@ const SIMPLE_STATUSES = ["new", "contacted"]
 function errorResponse(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
+function clean(value: unknown, maxLength: number) {
+  return String(value ?? "").trim().slice(0, maxLength)
+}
 async function recordError(adminClient: any, id: string, error: unknown, extra: Record<string, unknown> = {}) {
   const message = error instanceof Error ? error.message : "İşlem tamamlanamadı."
   await adminClient.from("demo_requests").update({ last_error: message, ...extra }).eq("id", id)
   return message
+}
+
+async function updateSalesFollowUp(auth: Awaited<ReturnType<typeof requireAdminAuth>>, body: any) {
+  if (!auth.ok) return auth.response
+  const id = String(body.id ?? "")
+  if (!id) return errorResponse("Demo talebi zorunludur.")
+
+  const followUpRaw = clean(body.follow_up_at, 80)
+  const followUpDate = followUpRaw ? new Date(followUpRaw) : null
+  if (followUpRaw && Number.isNaN(followUpDate?.getTime())) {
+    return errorResponse("Takip tarihi geçersiz.")
+  }
+
+  const { data, error } = await auth.context.adminClient.from("demo_requests").update({
+    sales_note: clean(body.sales_note, 2000) || null,
+    recommended_provider: clean(body.recommended_provider, 120) || null,
+    next_action: clean(body.next_action, 500) || null,
+    follow_up_at: followUpDate ? followUpDate.toISOString() : null,
+    last_error: null,
+  }).eq("id", id).select("*").maybeSingle()
+
+  if (error) return errorResponse(error.message, 500)
+  if (!data) return errorResponse("Demo talebi bulunamadı.", 404)
+  return NextResponse.json({ request: data, message: "Satış takip notu kaydedildi." })
 }
 
 async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType<typeof requireAdminAuth>>, id: string) {
@@ -177,6 +204,8 @@ export async function PATCH(request: NextRequest) {
   if (!auth.ok) return auth.response
 
   const body = await request.json()
+  if (body.action === "sales_update") return updateSalesFollowUp(auth, body)
+
   const id = String(body.id ?? "")
   const status = String(body.status ?? "")
   const rejectionReason = String(body.rejection_reason ?? "").trim().slice(0, 1000)

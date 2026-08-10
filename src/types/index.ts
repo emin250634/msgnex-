@@ -259,6 +259,10 @@ export interface DemoRequest {
   company_id: string | null
   invitation_id: string | null
   rejection_reason: string | null
+  sales_note: string | null
+  recommended_provider: string | null
+  next_action: string | null
+  follow_up_at: string | null
   last_email_sent_at: string | null
   last_error: string | null
   created_at: string
