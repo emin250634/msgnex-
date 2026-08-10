@@ -15,6 +15,15 @@ import type { Contact, Group, SmsTemplate } from "@/types"
 const NO_SEGMENT = "__none__"
 const ALL_CONTACTS = "__all__"
 
+const templateCategoryLabels: Record<SmsTemplate["category"], string> = {
+  general: "Genel",
+  campaign: "Kampanya",
+  announcement: "Duyuru",
+  appointment: "Randevu",
+  payment: "Ödeme",
+  support: "Destek",
+}
+
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "")
   if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`
@@ -44,6 +53,7 @@ export default function SmsPage() {
   const [confirmAllContacts, setConfirmAllContacts] = useState(false)
   const [showFinalConfirm, setShowFinalConfirm] = useState(false)
   const [suppressionPhones, setSuppressionPhones] = useState<string[]>([])
+  const [prefillNotice, setPrefillNotice] = useState("")
 
   useEffect(() => {
     const sb = createClient()
@@ -64,6 +74,26 @@ export default function SmsPage() {
       }
     })
     sb.rpc("get_customer_plan_limits").then(({ data }) => setPlanLimits(data?.[0] ?? null))
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const params = new URLSearchParams(window.location.search)
+    const prefillMessage = params.get("message")
+    const prefillGroup = params.get("group")
+    const source = params.get("source")
+
+    if (!prefillMessage && !prefillGroup) return
+
+    if (prefillMessage) setMessage(prefillMessage.slice(0, MAX_SMS_LENGTH))
+    if (prefillGroup) setSelectedGroup(prefillGroup)
+    setShowFinalConfirm(false)
+    setConfirmAllContacts(false)
+    if (source === "campaign-copy") {
+      setPrefillNotice("Önceki kampanya içeriği hazırlandı. Alıcıları ve mesajı kontrol edip yeniden gönderebilirsiniz.")
+    }
+    window.history.replaceState(null, "", "/sms")
   }, [])
 
   const manualRecipients = useMemo(() => manualNumbers
@@ -238,6 +268,12 @@ export default function SmsPage() {
         }
       />
 
+      {prefillNotice && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          {prefillNotice}
+        </div>
+      )}
+
       <Card title="Şablon Seç">
         <div className="flex flex-wrap gap-2">
           <select
@@ -247,7 +283,9 @@ export default function SmsPage() {
           >
             <option value="">Şablon seçin (isteğe bağlı)</option>
             {templates.map((template) => (
-              <option key={template.id} value={template.id}>{template.name}</option>
+              <option key={template.id} value={template.id}>
+                {templateCategoryLabels[template.category || "general"]} - {template.name}
+              </option>
             ))}
           </select>
           {selectedTemplate && (

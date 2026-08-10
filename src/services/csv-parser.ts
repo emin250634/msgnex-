@@ -15,6 +15,7 @@ export interface CsvContactMapping {
   first_name?: string
   last_name?: string
   email?: string
+  birth_date?: string
   consent_status?: string
   consent_source?: string
   consent_note?: string
@@ -35,12 +36,41 @@ function normalizePhone(phone: string): string {
   return digits
 }
 
+function normalizeBirthDate(value?: string): string | undefined {
+  const raw = String(value || "").trim()
+  if (!raw) return undefined
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return isValidDate(raw) ? raw : undefined
+  }
+
+  const match = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/)
+  if (!match) return undefined
+
+  const day = match[1].padStart(2, "0")
+  const month = match[2].padStart(2, "0")
+  const normalized = `${match[3]}-${month}-${day}`
+  return isValidDate(normalized) ? normalized : undefined
+}
+
+function isValidDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 function detectMapping(fields: string[] = []): CsvContactMapping {
   return {
     phone: fields.find((f) => /phone|telefon|gsm|cep|mobile|tel/i.test(f)),
     first_name: fields.find((f) => /first.?name|ad|isim|name|first/i.test(f)),
     last_name: fields.find((f) => /last.?name|soyad|soyisim|surname|last/i.test(f)),
     email: fields.find((f) => /email|e-posta|mail|eposta/i.test(f)),
+    birth_date: fields.find((f) => /birth|birthday|dogum|doğum|dogum_tarihi|doğum_tarihi|date_of_birth/i.test(f)),
     consent_status: fields.find((f) => /consent|izin|kvkk|onay|permission/i.test(f)),
     consent_source: fields.find((f) => /consent_source|izin_kaynagi|izin_kaynağı|kaynak|source/i.test(f)),
     consent_note: fields.find((f) => /consent_note|izin_notu|not|note/i.test(f)),
@@ -66,6 +96,7 @@ export function parseContactCsv(content: string, mappingOverride: CsvContactMapp
   const firstNameKey = mapping.first_name
   const lastNameKey = mapping.last_name
   const emailKey = mapping.email
+  const birthDateKey = mapping.birth_date
   const consentStatusKey = mapping.consent_status
   const consentSourceKey = mapping.consent_source
   const consentNoteKey = mapping.consent_note
@@ -92,11 +123,19 @@ export function parseContactCsv(content: string, mappingOverride: CsvContactMapp
     }
     seenPhones.add(normalizedPhone)
 
+    const rawBirthDate = birthDateKey ? (row[birthDateKey] || "").trim() : ""
+    const birthDate = normalizeBirthDate(rawBirthDate)
+    if (rawBirthDate && !birthDate) {
+      errors.push({ row: idx + 1, message: `Satır ${idx + 1}: Doğum tarihi geçersiz` })
+      return
+    }
+
     data.push({
       first_name: firstNameKey ? (row[firstNameKey] || "").trim() : "",
       last_name: lastNameKey ? (row[lastNameKey] || "").trim() : undefined,
       phone: normalizedPhone,
       email: emailKey ? (row[emailKey] || "").trim() : undefined,
+      birth_date: birthDate,
       consent_status: consentStatusKey ? parseConsentStatus(row[consentStatusKey]) : undefined,
       consent_source: consentSourceKey ? (row[consentSourceKey] || "").trim() : undefined,
       consent_note: consentNoteKey ? (row[consentNoteKey] || "").trim() : undefined,

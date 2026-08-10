@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
@@ -484,6 +485,17 @@ function matchesDlr(campaign: SmsCampaign, filter: DlrFilter) {
 function percent(part: number, total: number) {
   if (total <= 0) return 0
   return Math.round((part / total) * 100)
+}
+
+function campaignReuseHref(campaign: SmsCampaign) {
+  const params = new URLSearchParams({
+    source: "campaign-copy",
+    message: campaign.message,
+  })
+
+  if (campaign.group_id) params.set("group", campaign.group_id)
+
+  return `/sms?${params.toString()}`
 }
 
 export default function CampaignsPage() {
@@ -982,6 +994,11 @@ export default function CampaignsPage() {
                 <Button variant="secondary" size="sm" className="mt-4 w-full" onClick={() => openDetails(campaign)}>
                   Rapor
                 </Button>
+                <Link href={campaignReuseHref(campaign)}>
+                  <Button variant="secondary" size="sm" className="mt-3 w-full">
+                    Tekrar Kullan
+                  </Button>
+                </Link>
                 {campaign.status === "queued" && (
                   <Button variant="danger" size="sm" className="mt-4 w-full" onClick={() => setCancelTarget(campaign)}>
                     İptal Et
@@ -1071,6 +1088,11 @@ export default function CampaignsPage() {
                       <Button variant="secondary" size="sm" onClick={() => openDetails(campaign)}>
                         Rapor
                       </Button>
+                      <Link href={campaignReuseHref(campaign)}>
+                        <Button variant="secondary" size="sm">
+                          Tekrar Kullan
+                        </Button>
+                      </Link>
                       {campaign.status === "queued" && (
                         <Button variant="danger" size="sm" onClick={() => setCancelTarget(campaign)}>
                           İptal Et

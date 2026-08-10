@@ -167,6 +167,12 @@ Başlanan işler:
   - CSV içi tekrar eden telefonlar ayrılır
   - izinli/izinsiz/bilinmeyen özeti gösterilir
   - son onaydan sonra içe aktarım yapılır
+- Kampanya tekrar kullanım akışı başlatıldı:
+  - kampanya listesinden önceki kampanya mesajı ve segmenti SMS gönder ekranına taşınabilir
+  - tekrar gönderim mevcut risk özeti, izin, kara liste ve provider kontrollerinden geçer
+- Şablon kategorileri başlatıldı:
+  - SMS şablonları genel, kampanya, duyuru, randevu, ödeme ve destek kategorilerine ayrılabilir
+  - SMS gönder ekranında şablon seçimi kategori etiketiyle gösterilir
 
 Yapılacaklar:
 
@@ -181,8 +187,6 @@ Yapılacaklar:
   - son gönderim tarihi bazlı
   - kara listede olmayanlar
 - Kampanya taslakları.
-- Kampanya kopyalama.
-- Şablon kategorileri.
 - Gönderim öncesi önizleme.
 - Başarısız numaraları ayrı listeye aktarma.
 
@@ -325,6 +329,10 @@ Başlanan işler:
   - firma detayında Satış & Pilot Notları kartı oluşturuldu
   - firma listesinde satış durumu ve beklenen aylık hacim görünür hale getirildi
   - demo onayıyla oluşan firmalara başvuru hacmi ve mesajı satış/pilot alanlarına taşınır
+- Doğum günü iletişimi için CRM altyapısı başlatıldı:
+  - kişi kayıtlarına doğum tarihi alanı eklendi
+  - manuel kişi ekleme/düzenleme ve CSV import doğum tarihi destekler
+  - kişi listesinde yaklaşan doğum günü sayısı, etiketi ve filtresi gösterilir
 
 Yapılacaklar:
 
@@ -334,7 +342,6 @@ Yapılacaklar:
   - sağlayıcı sonucu geldi
 - Hazır otomasyonlar:
   - doğum günü mesajı
-    - kişi kartına doğum tarihi ve özel gün alanları eklenecek
     - doğum günü yaklaşan kişiler için otomatik segment/hatırlatma üretilecek
     - müşteriye özel kutlama veya kampanya SMS şablonu seçilebilecek
   - pasif müşteri hatırlatma

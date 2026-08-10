@@ -14,6 +14,21 @@ import { MAX_SMS_LENGTH } from "@/lib/sms-segments"
 import { createClient } from "@/lib/supabase/client"
 import type { SmsTemplate } from "@/types"
 
+type TemplateCategory = SmsTemplate["category"]
+
+const templateCategories: { value: TemplateCategory; label: string }[] = [
+  { value: "general", label: "Genel" },
+  { value: "campaign", label: "Kampanya" },
+  { value: "announcement", label: "Duyuru" },
+  { value: "appointment", label: "Randevu" },
+  { value: "payment", label: "Ödeme" },
+  { value: "support", label: "Destek" },
+]
+
+function categoryLabel(value?: string | null) {
+  return templateCategories.find((category) => category.value === value)?.label || "Genel"
+}
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<SmsTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -21,6 +36,7 @@ export default function TemplatesPage() {
   const [search, setSearch] = useState("")
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState("")
+  const [category, setCategory] = useState<TemplateCategory>("general")
   const [message, setMessage] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
 
@@ -48,6 +64,7 @@ export default function TemplatesPage() {
 
   const resetForm = () => {
     setName("")
+    setCategory("general")
     setMessage("")
     setEditingId(null)
     setShowForm(false)
@@ -63,10 +80,10 @@ export default function TemplatesPage() {
     }
 
     if (editingId) {
-      await sb.from("sms_templates").update({ name: name.trim(), message }).eq("id", editingId)
+      await sb.from("sms_templates").update({ name: name.trim(), category, message }).eq("id", editingId)
       toast.success("Şablon güncellendi")
     } else {
-      await sb.from("sms_templates").insert({ company_id: profile.company_id, name: name.trim(), message })
+      await sb.from("sms_templates").insert({ company_id: profile.company_id, name: name.trim(), category, message })
       toast.success("Şablon oluşturuldu")
     }
 
@@ -76,6 +93,7 @@ export default function TemplatesPage() {
 
   const handleEdit = (template: SmsTemplate) => {
     setName(template.name)
+    setCategory(template.category || "general")
     setMessage(template.message)
     setEditingId(template.id)
     setShowForm(true)
@@ -91,7 +109,11 @@ export default function TemplatesPage() {
   const filtered = useMemo(() => {
     if (!search.trim()) return templates
     const q = search.toLowerCase()
-    return templates.filter((template) => template.name.toLowerCase().includes(q) || template.message.toLowerCase().includes(q))
+    return templates.filter((template) =>
+      template.name.toLowerCase().includes(q) ||
+      template.message.toLowerCase().includes(q) ||
+      categoryLabel(template.category).toLowerCase().includes(q)
+    )
   }, [templates, search])
 
   if (loading) {
@@ -118,7 +140,7 @@ export default function TemplatesPage() {
         title="SMS Şablonları"
         description="Sık kullanılan mesaj içeriklerini yönetin ve kampanya hazırlığını hızlandırın."
         actions={
-          <Button onClick={() => { setShowForm(!showForm); setEditingId(null); setName(""); setMessage("") }}>
+          <Button onClick={() => { setShowForm(!showForm); setEditingId(null); setName(""); setCategory("general"); setMessage("") }}>
             {showForm ? "Kapat" : "Şablon Oluştur"}
           </Button>
         }
@@ -128,6 +150,12 @@ export default function TemplatesPage() {
         <Card title={editingId ? "Şablon Düzenle" : "Yeni Şablon"}>
           <div className="space-y-4">
             <Input label="Şablon Adı" placeholder="Örn: Kampanya duyurusu" value={name} onChange={(event) => setName(event.target.value)} />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Kategori</label>
+              <select value={category} onChange={(event) => setCategory(event.target.value as TemplateCategory)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                {templateCategories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Mesaj İçeriği</label>
               <textarea
@@ -159,6 +187,7 @@ export default function TemplatesPage() {
             <THead>
               <Tr>
                 <Th>Şablon Adı</Th>
+                <Th>Kategori</Th>
                 <Th>Mesaj</Th>
                 <Th>Oluşturulma</Th>
                 <Th></Th>
@@ -168,6 +197,7 @@ export default function TemplatesPage() {
               {filtered.map((template) => (
                 <Tr key={template.id}>
                   <Td className="font-medium">{template.name}</Td>
+                  <Td className="text-sm text-gray-600">{categoryLabel(template.category)}</Td>
                   <Td className="max-w-sm truncate text-sm text-gray-600">{template.message}</Td>
                   <Td className="text-sm text-gray-500">{new Date(template.created_at).toLocaleDateString("tr-TR")}</Td>
                   <Td>

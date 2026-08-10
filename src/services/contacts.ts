@@ -73,6 +73,7 @@ export async function importContactsFromCsv(
       last_name: c.last_name || null,
       phone: c.phone,
       email: c.email || null,
+      birth_date: c.birth_date || null,
       group_id: groupId || null,
       consent_status: consentStatus,
       consent_source: consentStatus !== "unknown" ? c.consent_source || "csv_import" : null,

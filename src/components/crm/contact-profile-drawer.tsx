@@ -19,6 +19,11 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleString("tr-TR")
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleDateString("tr-TR")
+}
+
 function statusTone(status: SmsMessage["status"]) {
   if (status === "delivered" || status === "sent") return "success" as const
   if (status === "failed") return "danger" as const
@@ -82,6 +87,7 @@ export function ContactProfileDrawer({ contact, group, tags, onClose }: ContactP
           <section className="rounded-2xl border border-gray-200 bg-gray-50 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Info label="E-posta" value={contact.email || "-"} />
+              <Info label="Doğum Tarihi" value={formatDateOnly(contact.birth_date)} />
               <Info label="Grup / Segment" value={group?.name || "Atanmamış"} />
               <div>
                 <p className="text-xs font-medium uppercase text-gray-500">Ticari ileti izni</p>

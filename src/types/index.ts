@@ -98,6 +98,7 @@ export interface Contact {
   last_name: string | null
   phone: string
   email: string | null
+  birth_date: string | null
   group_id: string | null
   consent_status: "unknown" | "opted_in" | "opted_out"
   consent_source: string | null
@@ -201,6 +202,7 @@ export interface SmsTemplate {
   company_id: string
   name: string
   message: string
+  category: "general" | "campaign" | "announcement" | "appointment" | "payment" | "support"
   created_at: string
   updated_at: string
 }
@@ -210,6 +212,7 @@ export interface CsvContactRow {
   last_name?: string
   phone: string
   email?: string
+  birth_date?: string
   consent_status?: "unknown" | "opted_in" | "opted_out"
   consent_source?: string
   consent_note?: string

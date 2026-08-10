@@ -17,6 +17,11 @@ function formatDate(value?: string | null) {
   return new Date(value).toLocaleString("tr-TR")
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return "-"
+  return new Date(value).toLocaleDateString("tr-TR")
+}
+
 function fullName(contact: Contact) {
   return `${contact.first_name}${contact.last_name ? ` ${contact.last_name}` : ""}`
 }
@@ -52,12 +57,36 @@ function isRecentContact(contact: Contact) {
   return Date.now() - createdAt <= 1000 * 60 * 60 * 24 * 30
 }
 
+function daysUntilNextBirthday(value?: string | null) {
+  if (!value) return null
+
+  const [year, month, day] = value.split("-").map(Number)
+  if (!year || !month || !day) return null
+
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let nextBirthday = new Date(today.getFullYear(), month - 1, day)
+
+  if (Number.isNaN(nextBirthday.getTime())) return null
+  if (nextBirthday < startOfToday) {
+    nextBirthday = new Date(today.getFullYear() + 1, month - 1, day)
+  }
+
+  return Math.ceil((nextBirthday.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function hasUpcomingBirthday(contact: Contact) {
+  const days = daysUntilNextBirthday(contact.birth_date)
+  return days !== null && days <= 30
+}
+
 function contactTags(contact: Contact, group: Group | null) {
   const tags: string[] = []
   if (group?.name) tags.push(group.name)
   if (group?.name?.toLowerCase().includes("vip")) tags.push("VIP")
   if (contact.email) tags.push("E-posta var")
   tags.push(consentLabel(contact.consent_status))
+  if (hasUpcomingBirthday(contact)) tags.push("Doğum günü yaklaşıyor")
   if (isRecentContact(contact)) tags.push("Yeni kayıt")
   if (!group) tags.push("Segmentsiz")
   return Array.from(new Set(tags))
@@ -160,6 +189,7 @@ export default function ContactDetailPage() {
               <Info label="Ad Soyad" value={fullName(contact)} />
               <Info label="Telefon" value={contact.phone} />
               <Info label="E-posta" value={contact.email || "-"} />
+              <Info label="Doğum Tarihi" value={formatDateOnly(contact.birth_date)} />
               <Info label="Segment" value={group?.name || "Segmentsiz"} />
               <div>
                 <p className="text-xs font-semibold uppercase text-gray-500">Ticari ileti izni</p>

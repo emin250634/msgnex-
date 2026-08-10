@@ -104,6 +104,7 @@ export function CsvUpload({ groupId, defaultConsentStatus = "unknown", remaining
               <MappingSelect label="Ad" value={mapping.first_name || ""} fields={parseResult.fields} onChange={(value) => updateMapping("first_name", value)} />
               <MappingSelect label="Soyad" value={mapping.last_name || ""} fields={parseResult.fields} onChange={(value) => updateMapping("last_name", value)} />
               <MappingSelect label="E-posta" value={mapping.email || ""} fields={parseResult.fields} onChange={(value) => updateMapping("email", value)} />
+              <MappingSelect label="Doğum Tarihi" value={mapping.birth_date || ""} fields={parseResult.fields} onChange={(value) => updateMapping("birth_date", value)} />
               <MappingSelect label="İzin Durumu" value={mapping.consent_status || ""} fields={parseResult.fields} onChange={(value) => updateMapping("consent_status", value)} />
               <MappingSelect label="İzin Kaynağı" value={mapping.consent_source || ""} fields={parseResult.fields} onChange={(value) => updateMapping("consent_source", value)} />
               <MappingSelect label="İzin Notu" value={mapping.consent_note || ""} fields={parseResult.fields} onChange={(value) => updateMapping("consent_note", value)} />
@@ -134,6 +135,7 @@ export function CsvUpload({ groupId, defaultConsentStatus = "unknown", remaining
             {preview.map((c, i) => (
               <li key={i} className="text-sm text-gray-700">
                 {c.first_name} {c.last_name} - {c.phone} - {consentLabel(c.consent_status || defaultConsentStatus)}
+                {c.birth_date ? ` - ${c.birth_date}` : ""}
               </li>
             ))}
           </ul>

@@ -21,8 +21,9 @@ import { recordContactConsentEvent } from "@/services/contacts"
 import type { Contact, Group } from "@/types"
 
 const PAGE_SIZE = 15
+const BIRTHDAY_LOOKAHEAD_DAYS = 30
 
-type TagFilter = "all" | "vip" | "email" | "new" | "unassigned"
+type TagFilter = "all" | "vip" | "email" | "birthday" | "new" | "unassigned"
 type ConsentStatus = Contact["consent_status"]
 
 function formatDate(value?: string | null) {
@@ -52,6 +53,29 @@ function isRecentContact(contact: Contact) {
   return Date.now() - createdAt <= 1000 * 60 * 60 * 24 * 30
 }
 
+function daysUntilNextBirthday(value?: string | null) {
+  if (!value) return null
+
+  const [year, month, day] = value.split("-").map(Number)
+  if (!year || !month || !day) return null
+
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let nextBirthday = new Date(today.getFullYear(), month - 1, day)
+
+  if (Number.isNaN(nextBirthday.getTime())) return null
+  if (nextBirthday < startOfToday) {
+    nextBirthday = new Date(today.getFullYear() + 1, month - 1, day)
+  }
+
+  return Math.ceil((nextBirthday.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function hasUpcomingBirthday(contact: Contact) {
+  const days = daysUntilNextBirthday(contact.birth_date)
+  return days !== null && days <= BIRTHDAY_LOOKAHEAD_DAYS
+}
+
 function deriveContactTags(contact: Contact, group?: Group | null) {
   const tags: string[] = []
   const groupName = group?.name?.trim()
@@ -60,6 +84,7 @@ function deriveContactTags(contact: Contact, group?: Group | null) {
   if (groupName?.toLowerCase().includes("vip")) tags.push("VIP")
   if (contact.email) tags.push("E-posta var")
   tags.push(consentLabel(contact.consent_status))
+  if (hasUpcomingBirthday(contact)) tags.push("Doğum günü yaklaşıyor")
   if (isRecentContact(contact)) tags.push("Yeni kayıt")
   if (!groupName) tags.push("Segmentsiz")
 
@@ -70,6 +95,7 @@ function hasTag(contact: Contact, group: Group | null, filter: TagFilter) {
   if (filter === "all") return true
   if (filter === "vip") return Boolean(group?.name?.toLowerCase().includes("vip"))
   if (filter === "email") return Boolean(contact.email)
+  if (filter === "birthday") return hasUpcomingBirthday(contact)
   if (filter === "new") return isRecentContact(contact)
   if (filter === "unassigned") return !contact.group_id
   return true
@@ -102,6 +128,7 @@ export default function ContactsPage() {
   const [lastName, setLastName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
+  const [birthDate, setBirthDate] = useState("")
   const [groupId, setGroupId] = useState("")
   const [consentStatus, setConsentStatus] = useState<ConsentStatus>("unknown")
   const [adding, setAdding] = useState(false)
@@ -188,6 +215,7 @@ export default function ContactsPage() {
         contact.last_name,
         contact.phone,
         contact.email,
+        contact.birth_date,
         group?.name,
       ].filter(Boolean).join(" ").toLowerCase()
 
@@ -205,6 +233,7 @@ export default function ContactsPage() {
   const unassignedCount = contacts.filter((contact) => !contact.group_id).length
   const consentedCount = contacts.filter((contact) => contact.consent_status === "opted_in").length
   const optedOutCount = contacts.filter((contact) => contact.consent_status === "opted_out").length
+  const upcomingBirthdayCount = contacts.filter(hasUpcomingBirthday).length
   const contactLimit = planUsage?.contact_limit ?? null
   const currentContactCount = planUsage?.current_contacts ?? contacts.length
   const remainingContactLimit = contactLimit === null ? undefined : Math.max(0, contactLimit - currentContactCount)
@@ -246,6 +275,7 @@ export default function ContactsPage() {
       last_name: contact.last_name || "",
       phone: contact.phone,
       email: contact.email || "",
+      birth_date: contact.birth_date || "",
       group_id: contact.group_id,
       consent_status: contact.consent_status || "unknown",
       consent_source: contact.consent_source || "",
@@ -266,6 +296,7 @@ export default function ContactsPage() {
     if (editValues.last_name !== undefined) updates.last_name = editValues.last_name || null
     if (editValues.phone !== undefined) updates.phone = editValues.phone
     if (editValues.email !== undefined) updates.email = editValues.email || null
+    if (editValues.birth_date !== undefined) updates.birth_date = editValues.birth_date || null
     if (editValues.group_id !== undefined) updates.group_id = editValues.group_id || null
     if (editValues.consent_status !== undefined) {
       updates.consent_status = editValues.consent_status
@@ -329,6 +360,7 @@ export default function ContactsPage() {
       last_name: lastName.trim() || null,
       phone: phone.trim(),
       email: email.trim() || null,
+      birth_date: birthDate || null,
       group_id: groupId || null,
       consent_status: consentStatus,
       consent_source: consentStatus !== "unknown" ? "manual" : null,
@@ -356,6 +388,7 @@ export default function ContactsPage() {
     setLastName("")
     setPhone("")
     setEmail("")
+    setBirthDate("")
     setGroupId("")
     setConsentStatus("unknown")
     setAdding(false)
@@ -428,10 +461,11 @@ export default function ContactsPage() {
         </div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
         <StatCard title="Toplam Kişi" value={contacts.length} description={planUsage ? `${PLAN_LABELS[planUsage.plan]} limiti: ${planUsage.contact_limit.toLocaleString("tr-TR")}` : "CRM kayıt sayısı"} tone="blue" />
         <StatCard title="İzinli Kişi" value={consentedCount} description="Ticari ileti onayı var" tone="emerald" />
         <StatCard title="İzinsiz Kişi" value={optedOutCount} description="SMS gönderiminden çıkarılır" tone="rose" />
+        <StatCard title="Yaklaşan Doğum Günü" value={upcomingBirthdayCount} description={`Önümüzdeki ${BIRTHDAY_LOOKAHEAD_DAYS} gün`} tone="amber" />
         <StatCard title="Segmentsiz" value={unassignedCount} description="Sınıflandırma bekleyen kayıt" tone="amber" />
       </div>
 
@@ -442,6 +476,7 @@ export default function ContactsPage() {
             <Input label="Soyad" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Soyad" />
             <Input label="Telefon *" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="05xxxxxxxxx" />
             <Input label="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ornek@mail.com" />
+            <Input label="Doğum Tarihi" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Segment</label>
               <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
@@ -472,10 +507,10 @@ export default function ContactsPage() {
             <p className="mb-1 font-medium">CSV formatı:</p>
             <p className="text-blue-700">CSV dosyanız şu sütunları içermelidir:</p>
             <pre className="mt-2 rounded bg-blue-100 px-3 py-2 text-xs leading-relaxed">
-              first_name,last_name,phone,email{"\n"}Ahmet,Yılmaz,05551234567,ahmet@mail.com{"\n"}Ayşe,Demir,05559876543,ayse@mail.com
+              first_name,last_name,phone,email,birth_date{"\n"}Ahmet,Yılmaz,05551234567,ahmet@mail.com,1990-05-12{"\n"}Ayşe,Demir,05559876543,ayse@mail.com,1988-11-03
             </pre>
             <p className="mt-2 text-blue-700">
-              <strong>phone</strong> ve <strong>first_name</strong> zorunludur. Telefon, gsm, ad, soyad gibi varyasyonlar da algılanır.
+              <strong>phone</strong> ve <strong>first_name</strong> zorunludur. Telefon, gsm, ad, soyad ve doğum tarihi gibi varyasyonlar da algılanır.
             </p>
             <p className="mt-2 text-blue-700">
               Dosya önce analiz edilir; hatalı ve tekrar eden satırlar gösterilir. Kayıtlar yalnızca son onaydan sonra içe aktarılır.
@@ -524,6 +559,7 @@ export default function ContactsPage() {
             <option value="all">Tüm etiketler</option>
             <option value="vip">VIP</option>
             <option value="email">E-postalı</option>
+            <option value="birthday">Doğum günü yaklaşan</option>
             <option value="new">Yeni kayıt</option>
             <option value="unassigned">Segmentsiz</option>
           </select>
@@ -543,6 +579,7 @@ export default function ContactsPage() {
                   <Th>Kişi</Th>
                   <Th>Telefon</Th>
                   <Th>E-posta</Th>
+                  <Th>Doğum Tarihi</Th>
                   <Th>Segment</Th>
                   <Th>İzin</Th>
                   <Th>Etiketler</Th>
@@ -562,6 +599,7 @@ export default function ContactsPage() {
                           <Td><Input value={editValues.first_name || ""} onChange={(e) => setEditValues({ ...editValues, first_name: e.target.value })} /></Td>
                           <Td><Input value={editValues.phone || ""} onChange={(e) => setEditValues({ ...editValues, phone: e.target.value })} /></Td>
                           <Td><Input value={editValues.email || ""} onChange={(e) => setEditValues({ ...editValues, email: e.target.value })} /></Td>
+                          <Td><Input type="date" value={editValues.birth_date || ""} onChange={(e) => setEditValues({ ...editValues, birth_date: e.target.value })} /></Td>
                           <Td>
                             <select
                               value={editValues.group_id || ""}
@@ -604,6 +642,7 @@ export default function ContactsPage() {
                           </Td>
                           <Td className="font-medium text-gray-700">{contact.phone}</Td>
                           <Td>{contact.email || "-"}</Td>
+                          <Td>{formatDate(contact.birth_date)}</Td>
                           <Td>{group ? <StatusBadge label={group.name} tone={group.name.toLowerCase().includes("vip") ? "purple" : "info"} /> : <StatusBadge label="Segmentsiz" tone="neutral" />}</Td>
                           <Td><StatusBadge label={consentLabel(contact.consent_status)} tone={consentTone(contact.consent_status)} /></Td>
                           <Td>
