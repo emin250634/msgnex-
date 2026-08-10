@@ -5,12 +5,30 @@ import { getResetPasswordRedirectUrl } from "@/lib/utils/app-url"
 
 const OWNER_ROLE = "company_owner"
 const SIMPLE_STATUSES = ["new", "contacted"]
+const PROVIDER_STATUS_LABELS: Record<string, string> = {
+  yes: "Mevcut sağlayıcı var",
+  no: "Sağlayıcı yok",
+  planning: "Teklif aşamasında",
+}
 
 function errorResponse(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 function clean(value: unknown, maxLength: number) {
   return String(value ?? "").trim().slice(0, maxLength)
+}
+function buildCompanySalesNote(demo: Record<string, any>) {
+  const rows = [
+    ["Demo mesajı", clean(demo.message, 1500)],
+    ["Mevcut sağlayıcı durumu", PROVIDER_STATUS_LABELS[clean(demo.has_sms_provider, 40)] || ""],
+    ["Paylaşılan sağlayıcı", clean(demo.sms_provider_name, 120)],
+    ["Önerilen sağlayıcı", clean(demo.recommended_provider, 120)],
+    ["Sonraki aksiyon", clean(demo.next_action, 500)],
+    ["Takip tarihi", demo.follow_up_at ? new Date(demo.follow_up_at).toLocaleString("tr-TR") : ""],
+    ["Satış notu", clean(demo.sales_note, 2000)],
+  ].filter(([, value]) => value)
+
+  return rows.map(([label, value]) => `${label}: ${value}`).join("\n")
 }
 async function recordError(adminClient: any, id: string, error: unknown, extra: Record<string, unknown> = {}) {
   const message = error instanceof Error ? error.message : "İşlem tamamlanamadı."
@@ -74,7 +92,7 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
         sender_approved: false,
         sales_status: "pilot",
         expected_monthly_sms_volume: String(demo.monthly_sms_volume || "").trim() || null,
-        sales_note: String(demo.message || "").trim() || null,
+        sales_note: buildCompanySalesNote(demo) || null,
       }).select("id").single()
       if (companyError || !company) throw new Error(companyError?.message || "Firma oluşturulamadı.")
       companyId = company.id
