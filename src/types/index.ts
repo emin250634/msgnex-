@@ -250,6 +250,8 @@ export interface DemoRequest {
   phone: string
   email: string
   monthly_sms_volume: string
+  has_sms_provider: "yes" | "no" | "planning" | null
+  sms_provider_name: string | null
   message: string | null
   status: "new" | "contacted" | "approved" | "rejected"
   approved_at: string | null

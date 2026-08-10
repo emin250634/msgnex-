@@ -7,6 +7,12 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { Input } from "@/components/ui/input"
 
 const volumes = ["1.000 altı", "1.000 - 10.000", "10.000 - 50.000", "50.000 - 250.000", "250.000+"]
+const providerStatuses = [
+  ["", "Seçin"],
+  ["yes", "Evet, mevcut sağlayıcımız var"],
+  ["planning", "Araştırma / teklif aşamasındayız"],
+  ["no", "Henüz sağlayıcımız yok"],
+]
 
 export default function DemoRequestPage() {
   const [loading, setLoading] = useState(false)
@@ -17,6 +23,8 @@ export default function DemoRequestPage() {
     phone: "",
     email: "",
     monthly_sms_volume: "",
+    has_sms_provider: "",
+    sms_provider_name: "",
     message: "",
     website: "",
   })
@@ -90,6 +98,13 @@ export default function DemoRequestPage() {
                     {volumes.map((volume) => <option key={volume}>{volume}</option>)}
                   </select>
                 </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="has_sms_provider" className="mb-1 block text-sm font-medium text-gray-700">Mevcut SMS sağlayıcınız var mı?</label>
+                  <select id="has_sms_provider" required value={form.has_sms_provider} onChange={(e) => setForm({ ...form, has_sms_provider: e.target.value })} className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    {providerStatuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </div>
+                <Input id="sms_provider_name" label="Varsa sağlayıcı adı" value={form.sms_provider_name} onChange={(e) => setForm({ ...form, sms_provider_name: e.target.value })} />
                 <div className="hidden" aria-hidden="true"><Input id="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} /></div>
                 <div className="sm:col-span-2">
                   <label htmlFor="message" className="mb-1 block text-sm font-medium text-gray-700">Mesaj</label>

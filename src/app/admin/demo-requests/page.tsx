@@ -16,6 +16,8 @@ interface DemoRequest {
   phone: string
   email: string
   monthly_sms_volume: string
+  has_sms_provider: "yes" | "no" | "planning" | null
+  sms_provider_name: string | null
   message: string | null
   status: "new" | "contacted" | "approved" | "rejected"
   company_id: string | null
@@ -30,6 +32,7 @@ interface DemoRequest {
 
 const labels = { new: "Yeni", contacted: "İletişime Geçildi", approved: "Onaylandı", rejected: "Reddedildi" }
 const tones = { new: "info", contacted: "warning", approved: "success", rejected: "danger" } as const
+const providerLabels = { yes: "Mevcut sağlayıcı var", no: "Sağlayıcı yok", planning: "Teklif aşamasında" }
 
 export default function AdminDemoRequestsPage() {
   const [requests, setRequests] = useState<DemoRequest[]>([])
@@ -114,6 +117,7 @@ export default function AdminDemoRequestsPage() {
                       <a href={`tel:${request.phone}`} className="hover:text-blue-700">{request.phone}</a>
                       <a href={`mailto:${request.email}`} className="hover:text-blue-700">{request.email}</a>
                       <span>Aylık: {request.monthly_sms_volume}</span>
+                      {request.has_sms_provider && <span>Sağlayıcı: {providerLabels[request.has_sms_provider]}{request.sms_provider_name ? ` / ${request.sms_provider_name}` : ""}</span>}
                       <span>{new Date(request.created_at).toLocaleString("tr-TR")}</span>
                     </div>
                     {request.message && <p className="mt-4 max-w-3xl rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-600">{request.message}</p>}

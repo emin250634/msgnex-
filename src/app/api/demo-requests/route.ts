@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const VOLUMES = ["1.000 altı", "1.000 - 10.000", "10.000 - 50.000", "50.000 - 250.000", "250.000+"]
+const PROVIDER_STATUSES = ["yes", "no", "planning"]
 
 function clean(value: unknown, maxLength: number) {
   return String(value ?? "").trim().slice(0, maxLength)
@@ -18,13 +19,18 @@ export async function POST(request: NextRequest) {
     const phone = clean(body.phone, 30)
     const email = clean(body.email, 180).toLowerCase()
     const monthlySmsVolume = clean(body.monthly_sms_volume, 40)
+    const hasSmsProvider = clean(body.has_sms_provider, 20)
+    const smsProviderName = clean(body.sms_provider_name, 120)
     const message = clean(body.message, 1500)
 
-    if (!fullName || !companyName || !phone || !email || !monthlySmsVolume) {
+    if (!fullName || !companyName || !phone || !email || !monthlySmsVolume || !hasSmsProvider) {
       return NextResponse.json({ error: "Zorunlu alanları eksiksiz doldurun." }, { status: 400 })
     }
     if (!email.includes("@") || !VOLUMES.includes(monthlySmsVolume)) {
       return NextResponse.json({ error: "E-posta veya SMS hacmi geçersiz." }, { status: 400 })
+    }
+    if (!PROVIDER_STATUSES.includes(hasSmsProvider)) {
+      return NextResponse.json({ error: "SMS sağlayıcı bilgisi geçersiz." }, { status: 400 })
     }
 
     const adminClient = createAdminClient()
@@ -34,6 +40,8 @@ export async function POST(request: NextRequest) {
       phone,
       email,
       monthly_sms_volume: monthlySmsVolume,
+      has_sms_provider: hasSmsProvider,
+      sms_provider_name: smsProviderName || null,
       message: message || null,
       status: "new",
     })
