@@ -168,6 +168,16 @@ function salesStatusTone(status?: string | null) {
   return "neutral" as const
 }
 
+function parseSalesNoteSummary(note: string) {
+  return note
+    .split("\n")
+    .map((line) => {
+      const [label, ...rest] = line.split(":")
+      return { label: label.trim(), value: rest.join(":").trim() }
+    })
+    .filter((item) => item.label && item.value)
+}
+
 function statusTone(status?: string | null) {
   if (status === "connected" || status === "approved" || status === "synced") return "success" as const
   if (status === "error" || status === "rejected") return "danger" as const
@@ -312,6 +322,7 @@ export default function AdminCompanyDetailPage() {
   const planLimits = PLAN_LIMITS[companyPlan]
   const activeUserCount = companyUsers.filter((user) => user.is_active).length
   const userLimitReached = activeUserCount >= planLimits.users
+  const salesNoteSummary = useMemo(() => parseSalesNoteSummary(salesForm.salesNote), [salesForm.salesNote])
 
   const providerHealth = useMemo(() => {
     if (!settings?.is_active) return { label: "Hazır değil", tone: "warning" as const }
@@ -588,6 +599,19 @@ export default function AdminCompanyDetailPage() {
       <Card title="Satış & Pilot Notları">
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="grid gap-4 md:grid-cols-3">
+            {salesNoteSummary.length > 0 && (
+              <div className="md:col-span-3">
+                <p className="mb-2 text-sm font-semibold text-gray-950">Demo satış bağlamı</p>
+                <div className="grid gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 md:grid-cols-2">
+                  {salesNoteSummary.map((item) => (
+                    <div key={`${item.label}-${item.value}`} className="rounded-lg bg-white p-3 text-sm shadow-sm">
+                      <p className="text-xs font-semibold uppercase text-blue-700">{item.label}</p>
+                      <p className="mt-1 leading-6 text-gray-700">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Satış durumu</label>
               <select
