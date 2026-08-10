@@ -37,11 +37,20 @@ interface DemoRequest {
 const labels = { new: "Yeni", contacted: "İletişime Geçildi", approved: "Onaylandı", rejected: "Reddedildi" }
 const tones = { new: "info", contacted: "warning", approved: "success", rejected: "danger" } as const
 const providerLabels = { yes: "Mevcut sağlayıcı var", no: "Sağlayıcı yok", planning: "Teklif aşamasında" }
+const followUpLabels = {
+  all: "Tüm takipler",
+  due_today: "Bugün aranacaklar",
+  due_week: "Bu hafta aranacaklar",
+  has_follow_up: "Takip tarihi olanlar",
+  missing_action: "Aksiyonu boş olanlar",
+  has_recommendation: "Sağlayıcı önerilenler",
+}
 
 export default function AdminDemoRequestsPage() {
   const [requests, setRequests] = useState<DemoRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [followUpFilter, setFollowUpFilter] = useState<keyof typeof followUpLabels>("all")
   const [updating, setUpdating] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<DemoRequest | null>(null)
   const [rejectionReason, setRejectionReason] = useState("")
@@ -121,7 +130,28 @@ export default function AdminDemoRequestsPage() {
     }
   }
 
-  const visible = useMemo(() => filter === "all" ? requests : requests.filter((item) => item.status === filter), [filter, requests])
+  const visible = useMemo(() => {
+    const now = new Date()
+    const todayEnd = new Date(now)
+    todayEnd.setHours(23, 59, 59, 999)
+    const weekEnd = new Date(now)
+    weekEnd.setDate(weekEnd.getDate() + 7)
+    weekEnd.setHours(23, 59, 59, 999)
+
+    return requests.filter((item) => {
+      if (statusFilter !== "all" && item.status !== statusFilter) return false
+      if (followUpFilter === "has_follow_up") return Boolean(item.follow_up_at)
+      if (followUpFilter === "missing_action") return !item.next_action
+      if (followUpFilter === "has_recommendation") return Boolean(item.recommended_provider)
+      if (followUpFilter === "due_today" || followUpFilter === "due_week") {
+        if (!item.follow_up_at) return false
+        const followUpDate = new Date(item.follow_up_at)
+        if (Number.isNaN(followUpDate.getTime())) return false
+        return followUpDate <= (followUpFilter === "due_today" ? todayEnd : weekEnd)
+      }
+      return true
+    })
+  }, [followUpFilter, requests, statusFilter])
 
   return (
     <div className="space-y-6">
@@ -129,7 +159,7 @@ export default function AdminDemoRequestsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(["new", "contacted", "approved", "rejected"] as const).map((status) => (
-          <button key={status} onClick={() => setFilter(status)} className="rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:border-blue-300 hover:shadow-md">
+          <button key={status} onClick={() => setStatusFilter(status)} className="rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:border-blue-300 hover:shadow-md">
             <p className="text-sm font-medium text-slate-500">{labels[status]}</p>
             <p className="mt-2 text-3xl font-semibold text-slate-950">{requests.filter((item) => item.status === status).length}</p>
           </button>
@@ -139,10 +169,15 @@ export default function AdminDemoRequestsPage() {
       <Card>
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="font-semibold text-slate-950">Başvurular</h2><p className="mt-1 text-sm text-slate-500">{visible.length} kayıt gösteriliyor</p></div>
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-            <option value="all">Tüm Durumlar</option>
-            {Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              <option value="all">Tüm Durumlar</option>
+              {Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value as keyof typeof followUpLabels)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+              {Object.entries(followUpLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
         </div>
 
         {loading ? (
