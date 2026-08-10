@@ -334,6 +334,9 @@ Yapılacaklar:
   - sağlayıcı sonucu geldi
 - Hazır otomasyonlar:
   - doğum günü mesajı
+    - kişi kartına doğum tarihi ve özel gün alanları eklenecek
+    - doğum günü yaklaşan kişiler için otomatik segment/hatırlatma üretilecek
+    - müşteriye özel kutlama veya kampanya SMS şablonu seçilebilecek
   - pasif müşteri hatırlatma
   - randevu hatırlatma
   - ödeme hatırlatma

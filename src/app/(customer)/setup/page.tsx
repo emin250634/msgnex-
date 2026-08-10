@@ -101,11 +101,11 @@ export default function SetupPage() {
   const steps = useMemo<SetupStep[]>(() => [
     {
       id: "provider",
-      title: "Provider bağlantısını hazırla",
-      description: "Netgsm hesabı, API bilgileri ve bağlantı durumu tamamlanmalı.",
+      title: "SMS sağlayıcı bağlantısını hazırla",
+      description: "Firmanızın yetkili SMS sağlayıcı hesabı ve bağlantı bilgileri hazır olmalı.",
       done: providerReady,
       href: "/provider",
-      action: "Providerı Aç",
+      action: "Bağlantıyı Aç",
     },
     {
       id: "sender-header",
@@ -143,7 +143,7 @@ export default function SetupPage() {
     {
       id: "first-campaign",
       title: "İlk test kampanyasını gönder",
-      description: "Provider hazır olduğunda küçük bir test alıcısına kampanya kuyruğa alın.",
+      description: "SMS sağlayıcı bağlantısı hazır olduğunda küçük bir test alıcısına kampanya gönderin.",
       done: counts.campaigns > 0,
       href: "/sms",
       action: "SMS Gönder",
@@ -151,7 +151,7 @@ export default function SetupPage() {
     {
       id: "api",
       title: "API entegrasyonunu hazırla",
-      description: "Dış sistemden gönderim yapılacaksa API anahtarı oluşturun ve rehberi paylaşın.",
+      description: "Dış sistemden SMS gönderimi yapılacaksa API anahtarı oluşturun ve geliştirici rehberini paylaşın.",
       done: !plan?.has_api_access || counts.apiKeys > 0,
       href: "/api-keys",
       action: "API Anahtarları",
@@ -159,11 +159,11 @@ export default function SetupPage() {
     },
     {
       id: "webhook",
-      title: "Webhook sonucunu bağla",
-      description: "Ajans/Kurumsal kullanımda kampanya ve provider sonuçlarını dış sisteme aktarın.",
+      title: "Sonuç bildirimlerini bağla",
+      description: "Ajans/Kurumsal kullanımda kampanya sonuçlarını dış sistemlerinize aktarın.",
       done: !plan?.has_webhook || counts.webhooks > 0,
       href: "/webhooks",
-      action: "Webhookları Aç",
+      action: "Bildirimleri Aç",
       optional: true,
     },
   ], [counts, plan, provider, providerReady])
@@ -220,14 +220,14 @@ export default function SetupPage() {
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
             <p className="text-sm font-semibold text-blue-950">Ticari amaç</p>
             <p className="mt-2 text-sm leading-6 text-blue-900">
-              Müşteri ilk girişte ne yapacağını görür; provider, kişi listesi, test gönderimi ve entegrasyon hazırlığı tek akışta ilerler.
+              İlk girişte ne yapacağınızı görün; sağlayıcı bağlantısı, kişi listesi, test gönderimi ve entegrasyon hazırlığı tek akışta ilerlesin.
             </p>
           </div>
         </div>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Metric title="Provider" value={providerReady ? "Hazır" : "Eksik"} tone={providerReady ? "success" : "warning"} />
+        <Metric title="Sağlayıcı" value={providerReady ? "Hazır" : "Eksik"} tone={providerReady ? "success" : "warning"} />
         <Metric title="Kişi" value={counts.contacts.toLocaleString("tr-TR")} tone={counts.contacts > 0 ? "success" : "warning"} />
         <Metric title="Kampanya" value={counts.campaigns.toLocaleString("tr-TR")} tone={counts.campaigns > 0 ? "success" : "info"} />
       </div>
