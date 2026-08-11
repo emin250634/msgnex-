@@ -1,2 +1,0 @@
--- Legacy compatibility migration.
--- The canonical base schema is 00000_clean_setup.sql.
