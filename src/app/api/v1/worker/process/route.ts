@@ -73,6 +73,12 @@ export async function POST(request: Request) {
   )
   if (staleError) return NextResponse.json({ error: staleError.message }, { status: 500 })
 
+  const { data: flaggedApiDispatchCount, error: staleApiError } = await supabase.rpc(
+    "flag_stale_api_sms_dispatches",
+    { p_timeout_minutes: parsed.data.staleTimeoutMinutes }
+  )
+  if (staleApiError) return NextResponse.json({ error: staleApiError.message }, { status: 500 })
+
   for (let index = 0; index < parsed.data.maxCampaigns; index += 1) {
     const { data: campaign, error: claimError } = await supabase.rpc("claim_queued_sms_campaign")
     if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 })
@@ -120,6 +126,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     processedCount: processed.length,
     flaggedForReviewCount: flaggedCount ?? 0,
+    flaggedApiDispatchForReviewCount: flaggedApiDispatchCount ?? 0,
     campaigns: processed,
   })
 }

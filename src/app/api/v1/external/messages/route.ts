@@ -113,6 +113,16 @@ export async function POST(request: Request) {
 
   if (!dispatch.created) {
     if (dispatch.status === "completed") return NextResponse.json({ ...dispatch.response, reused: true })
+    if (dispatch.status === "review_required") {
+      return NextResponse.json(
+        {
+          errorCode: "DISPATCH_REVIEW_REQUIRED",
+          error: "Bu istegin provider teslim durumu belirsiz. Yeni SMS gonderilmedi; manuel inceleme gerekiyor.",
+          campaignId: dispatch.response?.campaignId ?? null,
+        },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: "Bu istek halen isleniyor" }, { status: 409 })
   }
 
