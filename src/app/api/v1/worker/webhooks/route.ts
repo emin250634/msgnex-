@@ -2,6 +2,14 @@ import { createHmac } from "crypto"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+  MAX_WEBHOOK_REDIRECTS,
+  MAX_WEBHOOK_RESPONSE_BODY_BYTES,
+  WEBHOOK_URL_BLOCKED,
+  validateRedirectTarget,
+  validateWebhookUrlForDelivery,
+  WebhookUrlBlockedError,
+} from "@/lib/security/webhook-url"
 
 const requestSchema = z.object({
   maxDeliveries: z.number().int().min(1).max(100).default(20),
@@ -28,8 +36,53 @@ function signPayload(secret: string, timestamp: string, body: string) {
   return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")
 }
 
+async function readLimitedResponseBody(response: Response) {
+  if (!response.body) return ""
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let received = 0
+
+  while (received < MAX_WEBHOOK_RESPONSE_BODY_BYTES) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value) continue
+
+    const remaining = MAX_WEBHOOK_RESPONSE_BODY_BYTES - received
+    const chunk = value.byteLength > remaining ? value.slice(0, remaining) : value
+    chunks.push(chunk)
+    received += chunk.byteLength
+
+    if (value.byteLength > remaining) break
+  }
+
+  await reader.cancel().catch(() => undefined)
+  return new TextDecoder().decode(concatChunks(chunks, received))
+}
+
+function concatChunks(chunks: Uint8Array[], totalLength: number) {
+  const output = new Uint8Array(totalLength)
+  let offset = 0
+  for (const chunk of chunks) {
+    output.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return output
+}
+
 async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) {
-  const timestamp = Math.floor(Date.now() / 1000).toString()
+  let targetUrl: URL
+  try {
+    targetUrl = await validateWebhookUrlForDelivery(delivery.endpoint_url)
+  } catch (error) {
+    return {
+      success: false,
+      responseStatus: null,
+      responseBody: "",
+      error: error instanceof WebhookUrlBlockedError ? WEBHOOK_URL_BLOCKED : "Webhook URL validation failed",
+    }
+  }
+
   const body = JSON.stringify({
     id: delivery.id,
     event: delivery.event_type,
@@ -37,38 +90,71 @@ async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) 
     createdAt: new Date().toISOString(),
     data: delivery.payload,
   })
-  const signature = signPayload(delivery.signing_secret, timestamp, body)
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await fetch(delivery.endpoint_url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "MSGNEX-Webhooks/1.0",
-        "X-MSGNEX-Event": delivery.event_type,
-        "X-MSGNEX-Delivery": delivery.id,
-        "X-MSGNEX-Timestamp": timestamp,
-        "X-MSGNEX-Signature": `sha256=${signature}`,
-      },
-      body,
-      signal: controller.signal,
-    })
+    const visitedUrls = new Set<string>()
 
-    const responseBody = await response.text().catch(() => "")
-    return {
-      success: response.ok,
-      responseStatus: response.status,
-      responseBody,
-      error: response.ok ? "" : `Webhook HTTP ${response.status}`,
+    for (let redirectCount = 0; redirectCount <= MAX_WEBHOOK_REDIRECTS; redirectCount += 1) {
+      if (visitedUrls.has(targetUrl.toString())) {
+        throw new WebhookUrlBlockedError("Webhook redirect loop blocked")
+      }
+      visitedUrls.add(targetUrl.toString())
+
+      const timestamp = Math.floor(Date.now() / 1000).toString()
+      const signature = signPayload(delivery.signing_secret, timestamp, body)
+      const response = await fetch(targetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "MSGNEX-Webhooks/1.0",
+          "X-MSGNEX-Event": delivery.event_type,
+          "X-MSGNEX-Delivery": delivery.id,
+          "X-MSGNEX-Timestamp": timestamp,
+          "X-MSGNEX-Signature": `sha256=${signature}`,
+        },
+        body,
+        signal: controller.signal,
+        redirect: "manual",
+      })
+
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location")
+        if (!location) {
+          return {
+            success: false,
+            responseStatus: response.status,
+            responseBody: "",
+            error: `Webhook HTTP ${response.status}`,
+          }
+        }
+
+        if (redirectCount === MAX_WEBHOOK_REDIRECTS) {
+          throw new WebhookUrlBlockedError("Webhook redirect limit exceeded")
+        }
+
+        targetUrl = validateRedirectTarget(location, targetUrl)
+        targetUrl = await validateWebhookUrlForDelivery(targetUrl.toString())
+        continue
+      }
+
+      const responseBody = await readLimitedResponseBody(response).catch(() => "")
+      return {
+        success: response.ok,
+        responseStatus: response.status,
+        responseBody,
+        error: response.ok ? "" : `Webhook HTTP ${response.status}`,
+      }
     }
+
+    throw new WebhookUrlBlockedError("Webhook redirect limit exceeded")
   } catch (error) {
     return {
       success: false,
       responseStatus: null,
       responseBody: "",
-      error: error instanceof Error ? error.message : "Webhook request failed",
+      error: error instanceof WebhookUrlBlockedError ? WEBHOOK_URL_BLOCKED : "Webhook request failed",
     }
   } finally {
     clearTimeout(timeout)
