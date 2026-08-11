@@ -134,7 +134,7 @@ BEGIN
 
   UPDATE public.company_webhooks webhook
   SET previous_signing_secret = webhook.signing_secret,
-      signing_secret = encode(gen_random_bytes(24), 'hex'),
+      signing_secret = encode(extensions.gen_random_bytes(24), 'hex'),
       secret_rotated_at = v_rotated_at,
       updated_at = now()
   WHERE webhook.id = p_webhook_id
