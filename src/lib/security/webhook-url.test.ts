@@ -28,6 +28,12 @@ describe("webhook URL SSRF validator", () => {
     expect(url.toString()).toBe("https://example.com/webhook")
   })
 
+  it("normalizes uppercase hostnames and trailing dots", async () => {
+    const url = await validateWebhookUrlForDelivery("https://EXAMPLE.COM./webhook", resolver(["93.184.216.34"]))
+
+    expect(url.hostname).toBe("example.com.")
+  })
+
   it("blocks non-HTTPS protocols and userinfo", async () => {
     await expectBlocked("http://example.com/webhook")
     await expectBlocked("file:///etc/passwd")
@@ -78,6 +84,7 @@ describe("webhook URL SSRF validator", () => {
     await expectBlocked("https://example.com/webhook", ["93.184.216.34", "192.168.1.10"])
     await expectBlocked("https://example.com/webhook", ["93.184.216.34", "::1"])
     await expectBlocked("https://example.com/webhook", ["::ffff:192.168.1.10"])
+    await expectBlocked("https://example.com/webhook", ["::ffff:169.254.169.254"])
   })
 
   it("fails closed when DNS resolution fails", async () => {
@@ -90,12 +97,21 @@ describe("webhook URL SSRF validator", () => {
     ).rejects.toBeInstanceOf(WebhookUrlBlockedError)
   })
 
+  it("fails closed when DNS resolution returns no records", async () => {
+    await expectBlocked("https://example.com/webhook", [])
+  })
+
+  it("allows duplicate public DNS records", async () => {
+    await expect(validateWebhookUrlForDelivery("https://example.com/webhook", resolver(["93.184.216.34", "93.184.216.34"]))).resolves.toBeInstanceOf(URL)
+  })
+
   it("validates redirect targets before they are followed", async () => {
     const baseUrl = new URL("https://example.com/webhook")
     const publicRedirect = validateRedirectTarget("/next", baseUrl)
 
     expect(publicRedirect.toString()).toBe("https://example.com/next")
     await expectBlocked(validateRedirectTarget("https://127.0.0.1/hit", baseUrl).toString())
+    expect(() => validateRedirectTarget("http://[::1", baseUrl)).toThrow(WebhookUrlBlockedError)
   })
 
   it("allows standard HTTPS and 8443 while blocking unsafe explicit ports", async () => {

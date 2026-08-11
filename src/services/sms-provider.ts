@@ -7,6 +7,7 @@
  */
 
 import { getProviderErrorInfo } from "@/lib/provider-errors"
+import { assertTestProviderAllowed } from "./test-provider-guard"
 
 export interface SendSmsParams {
   recipient: string
@@ -572,7 +573,7 @@ export function createSmsProvider(): SmsProvider {
 
   const provider = configuredProvider || "fake"
   if (provider === "netgsm") return new NetgsmProvider()
-  if (provider === "fake") return new FakeSmsProvider()
+  if (provider === "fake") return createTestSmsProvider()
   throw new Error(`Desteklenmeyen SMS provider: ${provider}`)
 }
 
@@ -581,5 +582,6 @@ export function createNetgsmProvider(config: NetgsmProviderConfig): SmsProvider 
 }
 
 export function createTestSmsProvider(): SmsProvider {
+  assertTestProviderAllowed()
   return new FakeSmsProvider()
 }

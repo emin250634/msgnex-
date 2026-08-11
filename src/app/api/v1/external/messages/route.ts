@@ -6,18 +6,14 @@ import { decryptProviderSecret } from "@/lib/security/provider-secret"
 import { createNetgsmProvider, createTestSmsProvider } from "@/services/sms-provider"
 import type { SendSmsResult, SmsProvider } from "@/services/sms-provider"
 import { MAX_SMS_LENGTH } from "@/lib/sms-segments"
+import { existingDispatchDecision, rateLimitDecision } from "@/lib/api-dispatch-contract"
+import { isValidSmsRecipient, normalizeUniqueTrPhones } from "@/lib/phone"
+import { createProviderFailureResults, mapProviderResultsToDispatchResults } from "@/services/provider-result"
 
 const requestSchema = z.object({
   recipients: z.array(z.string()).min(1).max(1000),
   message: z.string().trim().min(1).max(MAX_SMS_LENGTH),
 })
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "")
-  if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`
-  if (digits.length === 10) return `90${digits}`
-  return digits
-}
 
 function getBearerToken(request: Request): string | null {
   const authorization = request.headers.get("authorization")
@@ -71,8 +67,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Alicilar veya mesaj formati gecersiz" }, { status: 400 })
   }
 
-  const recipients = Array.from(new Set(parsed.data.recipients.map(normalizePhone).filter(Boolean)))
-  if (recipients.length === 0 || recipients.some((recipient) => !/^\d{10,15}$/.test(recipient))) {
+  const recipients = normalizeUniqueTrPhones(parsed.data.recipients)
+  if (recipients.length === 0 || recipients.some((recipient) => !isValidSmsRecipient(recipient))) {
     return NextResponse.json({ error: "Gecerli bir telefon numarasi girin" }, { status: 400 })
   }
 
@@ -103,28 +99,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: dispatchError?.message || "Gonderim hazirlanamadi" }, { status: 400 })
   }
 
-  if (dispatch.rate_limited) {
-    const retryAfterSeconds = dispatch.retry_after_seconds ?? 60
-    return NextResponse.json(
-      { error: dispatch.message || "API rate limit exceeded", retryAfterSeconds },
-      { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
-    )
-  }
+  const rateLimit = rateLimitDecision(dispatch)
+  if (rateLimit) return NextResponse.json(rateLimit.body, { status: rateLimit.status, headers: rateLimit.headers })
 
-  if (!dispatch.created) {
-    if (dispatch.status === "completed") return NextResponse.json({ ...dispatch.response, reused: true })
-    if (dispatch.status === "review_required") {
-      return NextResponse.json(
-        {
-          errorCode: "DISPATCH_REVIEW_REQUIRED",
-          error: "Bu istegin provider teslim durumu belirsiz. Yeni SMS gonderilmedi; manuel inceleme gerekiyor.",
-          campaignId: dispatch.response?.campaignId ?? null,
-        },
-        { status: 409 }
-      )
-    }
-    return NextResponse.json({ error: "Bu istek halen isleniyor" }, { status: 409 })
-  }
+  const existingDispatch = existingDispatchDecision(dispatch)
+  if (existingDispatch) return NextResponse.json(existingDispatch.body, { status: existingDispatch.status })
 
   let provider: SmsProvider
   let providerResults: SendSmsResult[]
@@ -136,25 +115,10 @@ export async function POST(request: Request) {
       dispatch.sender_id
     )
   } catch {
-    providerResults = dispatch.messages.map(() => ({
-      success: false,
-      messageId: null,
-      error: "Provider istegi tamamlanamadi",
-    }))
+    providerResults = createProviderFailureResults(dispatch.messages.length, "Provider istegi tamamlanamadi")
   }
 
-  const results = providerResults.map((result, index) => ({
-    id: dispatch.messages[index].id,
-    success: result.success,
-    accepted: result.accepted ?? result.success,
-    provider_name: result.providerName ?? null,
-    provider_bulk_id: result.providerBulkId ?? null,
-    provider_message_id: result.messageId,
-    provider_status_code: result.providerStatusCode ?? null,
-    provider_status_text: result.providerStatusText ?? null,
-    error: result.error ?? null,
-    raw_status: result.rawStatus ?? null,
-  }))
+  const results = mapProviderResultsToDispatchResults(dispatch.messages, providerResults)
 
   const { data: completed, error: completionError } = await supabase.rpc("complete_api_sms_dispatch", {
     p_api_key_hash: apiKeyHash,
