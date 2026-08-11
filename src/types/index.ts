@@ -176,6 +176,18 @@ export interface SmsCampaign {
   updated_at: string
 }
 
+export interface SmsCampaignDraft {
+  id: string
+  company_id: string
+  name: string
+  message: string
+  audience_type: "none" | "all" | "group" | "manual"
+  group_id: string | null
+  manual_recipients: string[]
+  created_at: string
+  updated_at: string
+}
+
 export interface SuppressionEntry {
   id: string
   company_id: string

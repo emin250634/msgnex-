@@ -180,6 +180,10 @@ Başlanan işler:
 - Başarısız alıcı temizliği görünür hale getirildi:
   - kampanya raporunda başarısız alıcılar için CSV, CRM filtresi, segment ve kara liste aksiyonları ayrı kartlara ayrıldı
   - tekil başarısız numara ve kara liste adayı sayıları rapor üzerinde gösterilir
+- Kampanya taslakları başlatıldı:
+  - SMS gönder ekranında mevcut çalışma taslak olarak kaydedilebilir
+  - taslaklar mesaj, alıcı kaynağı, segment ve manuel numara bilgilerini saklar
+  - kayıtlı taslaklar yeniden yüklenebilir veya silinebilir
 
 Yapılacaklar:
 
@@ -193,7 +197,6 @@ Yapılacaklar:
   - şehir/etiket bazlı
   - son gönderim tarihi bazlı
   - kara listede olmayanlar
-- Kampanya taslakları.
 
 Ticari etkisi:
 
