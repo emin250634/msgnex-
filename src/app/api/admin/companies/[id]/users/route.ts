@@ -6,9 +6,9 @@ import { PLAN_LIMITS, isCompanyPlan, type CompanyPlan } from "@/lib/plans"
 const COMPANY_ROLES = ["company_owner", "company_admin", "company_user"]
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 function validationError(message: string) {
@@ -29,7 +29,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient } = auth.context
-    const { data: company, error: companyError } = await ensureCompany(adminClient, params.id)
+    const { id } = await params
+    const { data: company, error: companyError } = await ensureCompany(adminClient, id)
     if (companyError) return NextResponse.json({ error: companyError.message }, { status: 500 })
     if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 })
 
@@ -37,12 +38,12 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       adminClient
         .from("company_users")
         .select("*")
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .order("created_at", { ascending: true }),
       adminClient
         .from("company_invitations")
         .select("*")
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .order("invited_at", { ascending: false }),
     ])
 
@@ -86,7 +87,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, userId } = auth.context
-    const { data: company, error: companyError } = await ensureCompany(adminClient, params.id)
+    const { id } = await params
+    const { data: company, error: companyError } = await ensureCompany(adminClient, id)
     if (companyError) return NextResponse.json({ error: companyError.message }, { status: 500 })
     if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 })
 
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const { count: currentUsers, error: countError } = await adminClient
       .from("company_users")
       .select("*", { count: "exact", head: true })
-      .eq("company_id", params.id)
+      .eq("company_id", id)
       .eq("is_active", true)
 
     if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
@@ -116,14 +118,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       data: {
         full_name: fullName,
         role,
-        company_id: params.id,
+        company_id: id,
       },
       redirectTo: getResetPasswordRedirectUrl(request.nextUrl.origin),
     })
 
     if (invite.error || !invite.data.user) {
       await adminClient.from("company_invitations").upsert({
-        company_id: params.id,
+        company_id: id,
         email,
         full_name: fullName,
         role,
@@ -140,12 +142,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       full_name: fullName,
       email,
       role,
-      company_id: params.id,
+      company_id: id,
       is_active: true,
     })
 
     await adminClient.from("company_users").upsert({
-      company_id: params.id,
+      company_id: id,
       user_id: invitedUser.id,
       role,
       is_active: true,
@@ -153,7 +155,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }, { onConflict: "company_id,user_id" })
 
     await adminClient.from("company_invitations").upsert({
-      company_id: params.id,
+      company_id: id,
       user_id: invitedUser.id,
       email,
       full_name: fullName,
