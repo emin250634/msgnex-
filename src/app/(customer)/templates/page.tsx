@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import toast from "react-hot-toast"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,15 @@ const templateCategories: { value: TemplateCategory; label: string }[] = [
 
 function categoryLabel(value?: string | null) {
   return templateCategories.find((category) => category.value === value)?.label || "Genel"
+}
+
+function templateSmsHref(template: SmsTemplate) {
+  const params = new URLSearchParams({
+    source: "template",
+    message: template.message,
+  })
+
+  return `/sms?${params.toString()}`
 }
 
 export default function TemplatesPage() {
@@ -202,6 +212,9 @@ export default function TemplatesPage() {
                   <Td className="text-sm text-gray-500">{new Date(template.created_at).toLocaleDateString("tr-TR")}</Td>
                   <Td>
                     <div className="flex gap-1">
+                      <Link href={templateSmsHref(template)}>
+                        <Button variant="secondary" size="sm">SMS ile Kullan</Button>
+                      </Link>
                       <Button size="sm" onClick={() => handleEdit(template)}>Düzenle</Button>
                       <Button variant="danger" size="sm" onClick={() => handleDelete(template.id)}>Sil</Button>
                     </div>

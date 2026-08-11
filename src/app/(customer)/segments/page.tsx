@@ -15,7 +15,9 @@ import { Table, TBody, Td, Th, THead, Tr } from "@/components/ui/table"
 import { createClient } from "@/lib/supabase/client"
 import type { Contact, Group, SmsMessage } from "@/types"
 
-type SegmentFilter = "all" | "vip" | "email" | "unassigned" | "active" | string
+type SegmentFilter = "all" | "vip" | "email" | "unassigned" | "active" | "consented" | "birthday" | string
+
+const BIRTHDAY_LOOKAHEAD_DAYS = 30
 
 function fullName(contact: Contact) {
   return `${contact.first_name}${contact.last_name ? ` ${contact.last_name}` : ""}`
@@ -24,6 +26,29 @@ function fullName(contact: Contact) {
 function formatDate(value?: string | null) {
   if (!value) return "-"
   return new Date(value).toLocaleDateString("tr-TR")
+}
+
+function daysUntilNextBirthday(value?: string | null) {
+  if (!value) return null
+
+  const [year, month, day] = value.split("-").map(Number)
+  if (!year || !month || !day) return null
+
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  let nextBirthday = new Date(today.getFullYear(), month - 1, day)
+
+  if (Number.isNaN(nextBirthday.getTime())) return null
+  if (nextBirthday < startOfToday) {
+    nextBirthday = new Date(today.getFullYear() + 1, month - 1, day)
+  }
+
+  return Math.ceil((nextBirthday.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function hasUpcomingBirthday(contact: Contact) {
+  const days = daysUntilNextBirthday(contact.birth_date)
+  return days !== null && days <= BIRTHDAY_LOOKAHEAD_DAYS
 }
 
 export default function SegmentsPage() {
@@ -104,6 +129,8 @@ export default function SegmentsPage() {
         (filter === "email" && Boolean(contact.email)) ||
         (filter === "unassigned" && !contact.group_id) ||
         (filter === "active" && activePhones.has(contact.phone)) ||
+        (filter === "consented" && contact.consent_status === "opted_in") ||
+        (filter === "birthday" && hasUpcomingBirthday(contact)) ||
         contact.group_id === filter
 
       return matchesSearch && matchesFilter
@@ -124,6 +151,56 @@ export default function SegmentsPage() {
   const emailCount = contacts.filter((contact) => Boolean(contact.email)).length
   const unassignedCount = contacts.filter((contact) => !contact.group_id).length
   const activeCount = contacts.filter((contact) => activePhones.has(contact.phone)).length
+  const consentedCount = contacts.filter((contact) => contact.consent_status === "opted_in").length
+  const upcomingBirthdayCount = contacts.filter(hasUpcomingBirthday).length
+
+  const ruleCards = [
+    {
+      id: "consented" as SegmentFilter,
+      title: "İzinli Kişiler",
+      description: "Ticari ileti izni olan kişiler.",
+      value: consentedCount,
+      tone: "success" as const,
+    },
+    {
+      id: "birthday" as SegmentFilter,
+      title: "Doğum Günü Yaklaşanlar",
+      description: `Önümüzdeki ${BIRTHDAY_LOOKAHEAD_DAYS} gün içinde doğum günü olan kişiler.`,
+      value: upcomingBirthdayCount,
+      tone: "warning" as const,
+    },
+    {
+      id: "unassigned" as SegmentFilter,
+      title: "Segmentsiz Kişiler",
+      description: "Henüz kalıcı segmente atanmamış kayıtlar.",
+      value: unassignedCount,
+      tone: "neutral" as const,
+    },
+    {
+      id: "active" as SegmentFilter,
+      title: "SMS Geçmişi Olanlar",
+      description: "Daha önce SMS kaydı oluşmuş kişiler.",
+      value: activeCount,
+      tone: "info" as const,
+    },
+  ]
+
+  const getRuleContacts = (ruleId: SegmentFilter) => contacts.filter((contact) => {
+    if (ruleId === "consented") return contact.consent_status === "opted_in"
+    if (ruleId === "birthday") return hasUpcomingBirthday(contact)
+    if (ruleId === "unassigned") return !contact.group_id
+    if (ruleId === "active") return activePhones.has(contact.phone)
+    return false
+  })
+
+  const startSmsFromRule = (rule: (typeof ruleCards)[number]) => {
+    const phones = getRuleContacts(rule.id).map((contact) => contact.phone).filter(Boolean)
+    if (phones.length === 0) return
+
+    sessionStorage.setItem("msgnex_segment_rule_recipients", JSON.stringify(phones))
+    sessionStorage.setItem("msgnex_segment_rule_name", rule.title)
+    window.location.href = "/sms?source=segment-rule"
+  }
 
   if (loading) {
     return (
@@ -158,6 +235,33 @@ export default function SegmentsPage() {
         <StatCard title="E-postalı Kişi" value={emailCount} description="Çok kanallı iletişim potansiyeli" tone="emerald" />
         <StatCard title="Aktif Kişi" value={activeCount} description="SMS geçmişi bulunan kişi" tone="amber" />
       </div>
+
+      <Card title="Dinamik Segment Kuralları">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {ruleCards.map((rule) => (
+            <div
+              key={rule.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 transition-all hover:border-blue-200 hover:bg-blue-50/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-950">{rule.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-gray-500">{rule.description}</p>
+                </div>
+                <StatusBadge label={rule.value.toString()} tone={rule.tone} />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setFilter(rule.id)}>
+                  Filtrele
+                </Button>
+                <Button size="sm" onClick={() => startSmsFromRule(rule)} disabled={rule.value === 0}>
+                  SMS Hazırla
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <Card title="Segment Özeti">
@@ -200,6 +304,8 @@ export default function SegmentsPage() {
               <option value="all">Tüm kişiler</option>
               <option value="vip">VIP müşteriler</option>
               <option value="email">E-postalı kişiler</option>
+              <option value="consented">İzinli kişiler</option>
+              <option value="birthday">Doğum günü yaklaşanlar</option>
               <option value="active">SMS geçmişi olanlar</option>
               <option value="unassigned">Segmentsiz kişiler</option>
               {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
@@ -235,6 +341,8 @@ export default function SegmentsPage() {
                         <div className="flex flex-wrap gap-1.5">
                           {isVip && <StatusBadge label="VIP" tone="purple" />}
                           {isActive && <StatusBadge label="Aktif" tone="success" />}
+                          {contact.consent_status === "opted_in" && <StatusBadge label="İzinli" tone="success" />}
+                          {hasUpcomingBirthday(contact) && <StatusBadge label="Doğum günü" tone="warning" />}
                           {contact.email && <StatusBadge label="E-posta" tone="info" />}
                         </div>
                       </Td>
@@ -272,7 +380,7 @@ export default function SegmentsPage() {
           </div>
           <div className="rounded-xl bg-gray-50 p-4">
             <p className="font-semibold text-gray-950">Sonraki adım</p>
-            <p className="mt-1">Kalıcı özel etiketler için ileride veritabanı modeli eklenebilir.</p>
+            <p className="mt-1">Dinamik kuralları kalıcı hedef kitle olarak kaydetmek için ileride veritabanı modeli eklenebilir.</p>
           </div>
         </div>
       </Card>

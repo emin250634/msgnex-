@@ -173,6 +173,7 @@ Başlanan işler:
 - Şablon kategorileri başlatıldı:
   - SMS şablonları genel, kampanya, duyuru, randevu, ödeme ve destek kategorilerine ayrılabilir
   - SMS gönder ekranında şablon seçimi kategori etiketiyle gösterilir
+  - şablon listesinden seçilen şablon doğrudan SMS gönder ekranına aktarılabilir
 - Gönderim öncesi önizleme güçlendirildi:
   - net gönderilecek alıcı, atlanacak kişi ve tahmini sağlayıcı kullanımı daha görünür hale getirildi
   - mesaj uzunluğu, SMS parça sayısı ve izin durumu bilinmeyen alıcılar ayrı gösterilir
@@ -186,6 +187,10 @@ Başlanan işler:
   - kayıtlı taslaklar yeniden yüklenebilir veya silinebilir
   - yüklenen taslak aktif çalışma olarak güncellenebilir veya yeni taslak olarak çoğaltılabilir
   - kampanya gönderime alındığında aktif taslak temizlenir
+- Dinamik segment kuralları başlatıldı:
+  - izinli kişiler, doğum günü yaklaşanlar, segmentsizler ve SMS geçmişi olanlar segment ekranında kural kartı olarak gösterilir
+  - dinamik kural kartları kişi listesini doğrudan filtreler
+  - dinamik kural hedef kitlesi SMS gönder ekranına manuel alıcı listesi olarak aktarılabilir
 
 Yapılacaklar:
 
@@ -194,11 +199,7 @@ Yapılacaklar:
   - hatalı numara tespiti
   - tekrar eden kişi temizliği
   - izin durumu seçimi
-- Segment kuralları:
-  - grup bazlı
-  - şehir/etiket bazlı
-  - son gönderim tarihi bazlı
-  - kara listede olmayanlar
+- Şehir/etiket ve son gönderim tarihi bazlı segment kuralları.
 
 Ticari etkisi:
 

@@ -112,8 +112,27 @@ export default function SmsPage() {
     const prefillMessage = params.get("message")
     const prefillGroup = params.get("group")
     const source = params.get("source")
+    let handledPrefill = false
 
-    if (!prefillMessage && !prefillGroup) return
+    if (source === "segment-rule") {
+      try {
+        const storedRecipients = JSON.parse(sessionStorage.getItem("msgnex_segment_rule_recipients") || "[]")
+        const ruleName = sessionStorage.getItem("msgnex_segment_rule_name") || "Dinamik segment"
+        if (Array.isArray(storedRecipients) && storedRecipients.length > 0) {
+          setSelectedGroup(NO_SEGMENT)
+          setManualNumbers(storedRecipients.map(String).join("\n"))
+          setPrefillNotice(`${ruleName} hedef kitlesi manuel alıcı olarak hazırlandı. Gönderim öncesi kontroller uygulanacaktır.`)
+          handledPrefill = true
+        }
+      } catch {
+        handledPrefill = false
+      } finally {
+        sessionStorage.removeItem("msgnex_segment_rule_recipients")
+        sessionStorage.removeItem("msgnex_segment_rule_name")
+      }
+    }
+
+    if (!handledPrefill && !prefillMessage && !prefillGroup) return
 
     if (prefillMessage) setMessage(prefillMessage.slice(0, MAX_SMS_LENGTH))
     if (prefillGroup) setSelectedGroup(prefillGroup)
@@ -121,6 +140,8 @@ export default function SmsPage() {
     setConfirmAllContacts(false)
     if (source === "campaign-copy") {
       setPrefillNotice("Önceki kampanya içeriği hazırlandı. Alıcıları ve mesajı kontrol edip yeniden gönderebilirsiniz.")
+    } else if (source === "template") {
+      setPrefillNotice("Seçilen şablon mesaj alanına aktarıldı. Alıcıları seçip gönderimi inceleyebilirsiniz.")
     }
     window.history.replaceState(null, "", "/sms")
   }, [])
