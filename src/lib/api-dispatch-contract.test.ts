@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { existingDispatchDecision, rateLimitDecision } from "./api-dispatch-contract"
+import { externalApiErrorResponse, existingDispatchDecision, rateLimitDecision } from "./api-dispatch-contract"
 
 describe("API dispatch idempotency and rate-limit contract", () => {
   it("returns rate-limit response without provider dispatch", () => {
@@ -13,6 +13,7 @@ describe("API dispatch idempotency and rate-limit contract", () => {
       headers: { "Retry-After": "120" },
       body: {
         error: "API rate limit exceeded: minute limit reached",
+        errorCode: "RATE_LIMIT_EXCEEDED",
         retryAfterSeconds: 120,
       },
     })
@@ -53,15 +54,36 @@ describe("API dispatch idempotency and rate-limit contract", () => {
     expect(existingDispatchDecision({ created: false, status: "processing" })).toMatchObject({
       shouldSendProvider: false,
       status: 409,
+      body: { errorCode: "IDEMPOTENCY_IN_PROGRESS" },
     })
     expect(existingDispatchDecision({ created: false, status: "unexpected" })).toMatchObject({
       shouldSendProvider: false,
       status: 409,
+      body: { errorCode: "IDEMPOTENCY_IN_PROGRESS" },
     })
   })
 
   it("allows provider dispatch only for newly created requests", () => {
     expect(existingDispatchDecision({ created: true })).toBeNull()
     expect(rateLimitDecision({ rate_limited: false })).toBeNull()
+  })
+
+  it("returns backward-compatible structured error responses", async () => {
+    const response = externalApiErrorResponse("INVALID_REQUEST", "Alicilar veya mesaj formati gecersiz")
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toEqual({
+      error: "Alicilar veya mesaj formati gecersiz",
+      errorCode: "INVALID_REQUEST",
+    })
+  })
+
+  it("does not require raw database error messages in external responses", async () => {
+    const response = externalApiErrorResponse("INTERNAL_ERROR", "Gonderim hazirlanamadi")
+    const body = await response.json()
+
+    expect(body.errorCode).toBe("INTERNAL_ERROR")
+    expect(JSON.stringify(body)).not.toContain("create_api_sms_dispatch")
+    expect(JSON.stringify(body)).not.toContain("P0001")
   })
 })

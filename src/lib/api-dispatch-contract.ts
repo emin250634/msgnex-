@@ -1,3 +1,28 @@
+import { NextResponse } from "next/server"
+
+export type ExternalApiErrorCode =
+  | "INVALID_API_KEY"
+  | "PROVIDER_NOT_CONFIGURED"
+  | "RATE_LIMIT_EXCEEDED"
+  | "INVALID_RECIPIENT"
+  | "INVALID_REQUEST"
+  | "IDEMPOTENCY_IN_PROGRESS"
+  | "DISPATCH_REVIEW_REQUIRED"
+  | "DISPATCH_FAILED"
+  | "INTERNAL_ERROR"
+
+export const EXTERNAL_API_ERROR_STATUS: Record<ExternalApiErrorCode, number> = {
+  INVALID_API_KEY: 401,
+  PROVIDER_NOT_CONFIGURED: 403,
+  RATE_LIMIT_EXCEEDED: 429,
+  INVALID_RECIPIENT: 400,
+  INVALID_REQUEST: 400,
+  IDEMPOTENCY_IN_PROGRESS: 409,
+  DISPATCH_REVIEW_REQUIRED: 409,
+  DISPATCH_FAILED: 400,
+  INTERNAL_ERROR: 500,
+}
+
 export interface ExistingApiDispatch {
   created?: boolean
   status?: string | null
@@ -27,6 +52,7 @@ export function rateLimitDecision(dispatch: RateLimitedDispatch): ApiDispatchDec
     headers: { "Retry-After": String(retryAfterSeconds) },
     body: {
       error: dispatch.message || "API rate limit exceeded",
+      errorCode: "RATE_LIMIT_EXCEEDED",
       retryAfterSeconds,
     },
   }
@@ -57,7 +83,28 @@ export function existingDispatchDecision(dispatch: ExistingApiDispatch): ApiDisp
 
   return {
     shouldSendProvider: false,
-    status: 409,
-    body: { error: "Bu istek halen isleniyor" },
+    status: EXTERNAL_API_ERROR_STATUS.IDEMPOTENCY_IN_PROGRESS,
+    body: {
+      errorCode: "IDEMPOTENCY_IN_PROGRESS",
+      error: "Bu istek halen isleniyor",
+    },
   }
+}
+
+export function externalApiErrorResponse(
+  code: ExternalApiErrorCode,
+  message: string,
+  init: { retryAfterSeconds?: number; headers?: Record<string, string> } = {}
+) {
+  return NextResponse.json(
+    {
+      error: message,
+      errorCode: code,
+      ...(init.retryAfterSeconds === undefined ? {} : { retryAfterSeconds: init.retryAfterSeconds }),
+    },
+    {
+      status: EXTERNAL_API_ERROR_STATUS[code],
+      headers: init.headers,
+    }
+  )
 }

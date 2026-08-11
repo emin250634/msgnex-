@@ -6,7 +6,7 @@
  * this module because provider credentials belong on the server.
  */
 
-import { getProviderErrorInfo } from "@/lib/provider-errors"
+import { getProviderErrorInfo } from "../lib/provider-errors"
 import { assertTestProviderAllowed } from "./test-provider-guard"
 
 export interface SendSmsParams {
