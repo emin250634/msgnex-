@@ -69,6 +69,7 @@ export default function SmsPage() {
   const [suppressionPhones, setSuppressionPhones] = useState<string[]>([])
   const [prefillNotice, setPrefillNotice] = useState("")
   const [draftName, setDraftName] = useState("")
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
   const [draftSaving, setDraftSaving] = useState(false)
 
   const loadCampaignDrafts = useCallback(async () => {
@@ -193,6 +194,10 @@ export default function SmsPage() {
   const recipientLimitExceeded = Boolean(planLimits && sendableRecipientCount > planLimits.campaign_recipient_limit)
   const canPrepareSend = Boolean(message.trim()) && hasAudience && sendableRecipientCount > 0 && providerReady && !recipientLimitExceeded && (!requiresAllContactsApproval || confirmAllContacts)
   const canSaveDraft = Boolean(draftName.trim() && message.trim())
+  const activeDraft = useMemo(
+    () => campaignDrafts.find((draft) => draft.id === activeDraftId) ?? null,
+    [activeDraftId, campaignDrafts]
+  )
 
   const handleTemplateSelect = (id: string) => {
     setSelectedTemplate(id)
@@ -236,7 +241,17 @@ export default function SmsPage() {
     toast.success("Şablon silindi")
   }
 
-  const handleSaveDraft = async () => {
+  const buildDraftPayload = (companyId: string) => ({
+    company_id: companyId,
+    name: draftName.trim(),
+    message,
+    audience_type: draftAudienceType,
+    group_id: draftAudienceType === "group" ? selectedGroup : null,
+    manual_recipients: draftAudienceType === "manual" ? manualRecipients.map(normalizePhone).filter(Boolean) : [],
+    updated_at: new Date().toISOString(),
+  })
+
+  const handleSaveDraft = async (mode: "create" | "update" = "create") => {
     if (!canSaveDraft) return
 
     setDraftSaving(true)
@@ -249,30 +264,27 @@ export default function SmsPage() {
       return
     }
 
-    const { error } = await sb.from("sms_campaign_drafts").insert({
-      company_id: profile.company_id,
-      name: draftName.trim(),
-      message,
-      audience_type: draftAudienceType,
-      group_id: draftAudienceType === "group" ? selectedGroup : null,
-      manual_recipients: draftAudienceType === "manual" ? manualRecipients.map(normalizePhone).filter(Boolean) : [],
-    })
+    const payload = buildDraftPayload(profile.company_id)
+    const { data: savedDraft, error } = mode === "update" && activeDraftId
+      ? await sb.from("sms_campaign_drafts").update(payload).eq("id", activeDraftId).select("*").single()
+      : await sb.from("sms_campaign_drafts").insert(payload).select("*").single()
 
     setDraftSaving(false)
 
     if (error) {
-      toast.error("Taslak kaydedilemedi")
+      toast.error(mode === "update" ? "Taslak güncellenemedi" : "Taslak kaydedilemedi")
       return
     }
 
-    toast.success("Kampanya taslağı kaydedildi")
-    setDraftName("")
+    if (savedDraft?.id) setActiveDraftId(savedDraft.id)
+    toast.success(mode === "update" ? "Taslak güncellendi" : "Kampanya taslağı kaydedildi")
     loadCampaignDrafts()
   }
 
   const handleLoadDraft = (draft: SmsCampaignDraft) => {
     setMessage(draft.message)
     setDraftName(draft.name)
+    setActiveDraftId(draft.id)
     setShowFinalConfirm(false)
     setConfirmAllContacts(false)
 
@@ -293,6 +305,11 @@ export default function SmsPage() {
     toast.success("Taslak yüklendi")
   }
 
+  const clearActiveDraft = () => {
+    setActiveDraftId(null)
+    setDraftName("")
+  }
+
   const handleDeleteDraft = async (id: string) => {
     const sb = createClient()
     const { error } = await sb.from("sms_campaign_drafts").delete().eq("id", id)
@@ -303,6 +320,7 @@ export default function SmsPage() {
     }
 
     toast.success("Taslak silindi")
+    if (activeDraftId === id) clearActiveDraft()
     loadCampaignDrafts()
   }
 
@@ -360,6 +378,11 @@ export default function SmsPage() {
 
     setQueuedCampaignId(data.campaignId)
     setShowFinalConfirm(false)
+    if (activeDraftId) {
+      await createClient().from("sms_campaign_drafts").delete().eq("id", activeDraftId)
+      clearActiveDraft()
+      loadCampaignDrafts()
+    }
     toast.success(`Kampanya kuyruğa alındı.${data.skippedRecipients ? ` ${data.skippedRecipients} kara listedeki numara atlandı.` : ""}`)
     setLoading(false)
   }
@@ -414,7 +437,10 @@ export default function SmsPage() {
                   <div key={draft.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-950">{draft.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-gray-950">{draft.name}</p>
+                          {activeDraftId === draft.id && <StatusBadge label="Aktif" tone="info" />}
+                        </div>
                         <p className="mt-1 line-clamp-2 text-sm leading-6 text-gray-600">{draft.message}</p>
                         <p className="mt-2 text-xs text-gray-500">
                           {draftAudienceLabel(draft, groups)} · {new Date(draft.updated_at).toLocaleDateString("tr-TR")}
@@ -436,9 +462,14 @@ export default function SmsPage() {
           </div>
 
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-            <p className="text-sm font-semibold text-blue-950">Mevcut çalışmayı taslak kaydet</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-blue-950">{activeDraft ? "Aktif taslak" : "Mevcut çalışmayı taslak kaydet"}</p>
+              {activeDraft && <StatusBadge label={activeDraft.name} tone="info" />}
+            </div>
             <p className="mt-1 text-xs leading-5 text-blue-800">
-              Mesaj, alıcı kaynağı ve manuel numaralar saklanır; gönderim kuyruğa alınmaz.
+              {activeDraft
+                ? "Yüklenen taslağı güncelleyebilir veya mevcut çalışmayı yeni taslak olarak saklayabilirsiniz."
+                : "Mesaj, alıcı kaynağı ve manuel numaralar saklanır; gönderim kuyruğa alınmaz."}
             </p>
             <div className="mt-4 space-y-3">
               <Input
@@ -446,9 +477,21 @@ export default function SmsPage() {
                 value={draftName}
                 onChange={(event) => setDraftName(event.target.value)}
               />
-              <Button className="w-full" onClick={handleSaveDraft} disabled={!canSaveDraft || draftSaving}>
-                {draftSaving ? "Kaydediliyor..." : "Taslak Kaydet"}
-              </Button>
+              <div className="space-y-2">
+                {activeDraftId && (
+                  <Button className="w-full" onClick={() => handleSaveDraft("update")} disabled={!canSaveDraft || draftSaving}>
+                    {draftSaving ? "Güncelleniyor..." : "Taslağı Güncelle"}
+                  </Button>
+                )}
+                <Button className="w-full" variant={activeDraftId ? "secondary" : "primary"} onClick={() => handleSaveDraft("create")} disabled={!canSaveDraft || draftSaving}>
+                  {draftSaving ? "Kaydediliyor..." : activeDraftId ? "Yeni Taslak Olarak Kaydet" : "Taslak Kaydet"}
+                </Button>
+                {activeDraftId && (
+                  <Button className="w-full" variant="secondary" onClick={clearActiveDraft} disabled={draftSaving}>
+                    Aktif Taslağı Bırak
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

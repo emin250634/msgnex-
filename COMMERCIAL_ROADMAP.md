@@ -184,6 +184,8 @@ Başlanan işler:
   - SMS gönder ekranında mevcut çalışma taslak olarak kaydedilebilir
   - taslaklar mesaj, alıcı kaynağı, segment ve manuel numara bilgilerini saklar
   - kayıtlı taslaklar yeniden yüklenebilir veya silinebilir
+  - yüklenen taslak aktif çalışma olarak güncellenebilir veya yeni taslak olarak çoğaltılabilir
+  - kampanya gönderime alındığında aktif taslak temizlenir
 
 Yapılacaklar:
 
