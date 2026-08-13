@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { createClient } from "@/lib/supabase/server"
 import { MAX_SMS_LENGTH } from "@/lib/sms-segments"
 import { isValidSmsRecipient, normalizeUniqueTrPhones } from "@/lib/phone"
@@ -10,6 +11,9 @@ const requestSchema = z.object({
 })
 
 export async function POST(request: Request) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Oturum gerekli" }, { status: 401 })

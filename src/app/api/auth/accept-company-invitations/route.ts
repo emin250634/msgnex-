@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { createClient } from "@/lib/supabase/server"
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/server-rate-limit"
 
@@ -15,6 +16,9 @@ function rateLimitedResponse(retryAfterSeconds: number) {
 }
 
 export async function POST(request: NextRequest) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const ipLimit = await checkRateLimit({
       key: `accept-invitation:ip:${clientIpFromHeaders(request.headers)}`,

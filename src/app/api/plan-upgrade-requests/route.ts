@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { createClient } from "@/lib/supabase/server"
 
 const PLAN_IDS = ["starter", "professional", "agency"] as const
@@ -12,6 +13,9 @@ function isPlanId(value: string): value is (typeof PLAN_IDS)[number] {
 }
 
 export async function POST(request: Request) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 

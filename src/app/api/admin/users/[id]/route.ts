@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { writeAuditLog } from "@/lib/audit-log"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 
 interface RouteContext {
   params: Promise<{
@@ -8,7 +9,10 @@ interface RouteContext {
   }>
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response

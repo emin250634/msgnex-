@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { writeAuditLog } from "@/lib/audit-log"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 
 const COMPANY_ROLES = ["company_owner", "company_admin", "company_user"]
 
@@ -16,6 +17,9 @@ function validationError(message: string) {
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
@@ -41,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       console.error("[admin-company-user:update:read-membership]", { companyId: id, membershipId, userId, error: membershipError })
       return NextResponse.json({ error: "Firma kullanıcısı okunamadı." }, { status: 500 })
     }
-    if (!membership) return NextResponse.json({ error: "Company user not found" }, { status: 404 })
+    if (!membership) return NextResponse.json({ error: "Firma kullanıcısı bulunamadı." }, { status: 404 })
 
     const ownerWillBeChanged =
       membership.role === "company_owner" &&
@@ -116,7 +120,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
@@ -134,7 +141,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       console.error("[admin-company-user:delete:read-membership]", { companyId: id, membershipId, userId, error: membershipError })
       return NextResponse.json({ error: "Firma kullanıcısı okunamadı." }, { status: 500 })
     }
-    if (!membership) return NextResponse.json({ error: "Company user not found" }, { status: 404 })
+    if (!membership) return NextResponse.json({ error: "Firma kullanıcısı bulunamadı." }, { status: 404 })
 
     if (membership.role === "company_owner") {
       const { count } = await adminClient

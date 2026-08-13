@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { writeAuditLog } from "@/lib/audit-log"
 import { requireAdminAuth } from "@/lib/auth/admin"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { decryptProviderSecret, encryptProviderSecret } from "@/lib/security/provider-secret"
 import { createNetgsmProvider, createTestSmsProvider } from "@/services/sms-provider"
 import type { SmsProvider } from "@/services/sms-provider"
@@ -182,7 +183,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
     if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 })
+      return NextResponse.json({ error: "Firma bulunamadı." }, { status: 404 })
     }
 
     return stateResponse(await readProviderState(adminClient, id))
@@ -197,6 +198,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
@@ -214,7 +218,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
     if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 })
+      return NextResponse.json({ error: "Firma bulunamadı." }, { status: 404 })
     }
 
     const body = await request.json().catch(() => ({}))
@@ -398,6 +402,9 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
@@ -415,7 +422,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
     if (!company) {
-      return NextResponse.json({ error: "Company not found" }, { status: 404 })
+      return NextResponse.json({ error: "Firma bulunamadı." }, { status: 404 })
     }
 
     const body = await request.json()

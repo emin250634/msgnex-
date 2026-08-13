@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { getResetPasswordRedirectUrl } from "@/lib/utils/app-url"
 import { PLAN_LIMITS, isCompanyPlan, type CompanyPlan } from "@/lib/plans"
 
@@ -35,7 +36,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       console.error("[admin-company-users:list:read-company]", { companyId: id, error: companyError })
       return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
-    if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 })
+    if (!company) return NextResponse.json({ error: "Firma bulunamadı." }, { status: 404 })
 
     const [{ data: memberships }, { data: invitations }] = await Promise.all([
       adminClient
@@ -87,6 +88,9 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 }
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
@@ -98,7 +102,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       console.error("[admin-company-users:invite:read-company]", { companyId: id, userId, error: companyError })
       return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
-    if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 })
+    if (!company) return NextResponse.json({ error: "Firma bulunamadı." }, { status: 404 })
 
     const body = await request.json()
     const email = String(body.email ?? "").trim().toLowerCase()
@@ -142,7 +146,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         role,
         status: "failed",
         invited_by: userId,
-        last_error: invite.error?.message || "Davet gönderilemedi",
+        last_error: "Davet gönderilemedi.",
       }, { onConflict: "company_id,email" })
       console.error("[admin-company-users:invite:send]", { companyId: id, userId, email, error: invite.error })
       return NextResponse.json({ error: "Davet gönderilemedi." }, { status: 500 })

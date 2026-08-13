@@ -1,13 +1,17 @@
 import { createHmac } from "crypto"
+import { request as httpsRequest } from "node:https"
+import type { IncomingHttpHeaders, IncomingMessage } from "node:http"
+import { isIP } from "node:net"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { hasValidWorkerAuthorization } from "@/lib/security/worker-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
   MAX_WEBHOOK_REDIRECTS,
   MAX_WEBHOOK_RESPONSE_BODY_BYTES,
   WEBHOOK_URL_BLOCKED,
+  resolveWebhookUrlForDelivery,
   validateRedirectTarget,
-  validateWebhookUrlForDelivery,
   WebhookUrlBlockedError,
 } from "@/lib/security/webhook-url"
 
@@ -26,54 +30,80 @@ interface ClaimedWebhookDelivery {
   attempts: number
 }
 
-function isAuthorized(request: Request): boolean {
-  const workerSecret = process.env.WORKER_SECRET
-  const authorization = request.headers.get("authorization")
-  return Boolean(workerSecret && authorization === `Bearer ${workerSecret}`)
-}
-
 function signPayload(secret: string, timestamp: string, body: string) {
   return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")
 }
 
-async function readLimitedResponseBody(response: Response) {
-  if (!response.body) return ""
-
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let received = 0
-
-  while (received < MAX_WEBHOOK_RESPONSE_BODY_BYTES) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (!value) continue
-
-    const remaining = MAX_WEBHOOK_RESPONSE_BODY_BYTES - received
-    const chunk = value.byteLength > remaining ? value.slice(0, remaining) : value
-    chunks.push(chunk)
-    received += chunk.byteLength
-
-    if (value.byteLength > remaining) break
-  }
-
-  await reader.cancel().catch(() => undefined)
-  return new TextDecoder().decode(concatChunks(chunks, received))
+type PinnedWebhookResponse = {
+  status: number
+  headers: IncomingHttpHeaders
+  body: string
 }
 
-function concatChunks(chunks: Uint8Array[], totalLength: number) {
-  const output = new Uint8Array(totalLength)
-  let offset = 0
-  for (const chunk of chunks) {
-    output.set(chunk, offset)
-    offset += chunk.byteLength
+async function readLimitedResponseBody(response: IncomingMessage) {
+  const chunks: Buffer[] = []
+  let received = 0
+
+  for await (const chunk of response) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    if (received >= MAX_WEBHOOK_RESPONSE_BODY_BYTES) continue
+
+    const remaining = MAX_WEBHOOK_RESPONSE_BODY_BYTES - received
+    const selected = buffer.byteLength > remaining ? buffer.subarray(0, remaining) : buffer
+    chunks.push(selected)
+    received += selected.byteLength
   }
-  return output
+
+  return Buffer.concat(chunks, received).toString("utf8")
+}
+
+function postPinnedWebhookRequest(
+  url: URL,
+  pinnedAddress: string,
+  headers: Record<string, string>,
+  body: string,
+  timeoutMs: number
+): Promise<PinnedWebhookResponse> {
+  return new Promise((resolve, reject) => {
+    const outbound = httpsRequest(
+      url,
+      {
+        method: "POST",
+        headers,
+        lookup: (_hostname, _options, callback) => {
+          callback(null, pinnedAddress, isIP(pinnedAddress))
+        },
+        servername: url.hostname,
+      },
+      async (response) => {
+        try {
+          resolve({
+            status: response.statusCode ?? 0,
+            headers: response.headers,
+            body: await readLimitedResponseBody(response),
+          })
+        } catch (error) {
+          reject(error)
+        }
+      }
+    )
+
+    outbound.setTimeout(timeoutMs, () => {
+      outbound.destroy(new Error("Webhook request timed out"))
+    })
+    outbound.on("error", reject)
+    outbound.write(body)
+    outbound.end()
+  })
 }
 
 async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) {
   let targetUrl: URL
+  let pinnedAddress: string
   try {
-    targetUrl = await validateWebhookUrlForDelivery(delivery.endpoint_url)
+    const resolved = await resolveWebhookUrlForDelivery(delivery.endpoint_url)
+    targetUrl = resolved.url
+    pinnedAddress = resolved.pinnedAddress
   } catch (error) {
     return {
       success: false,
@@ -90,9 +120,6 @@ async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) 
     createdAt: new Date().toISOString(),
     data: delivery.payload,
   })
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
-
   try {
     const visitedUrls = new Set<string>()
 
@@ -104,9 +131,10 @@ async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) 
 
       const timestamp = Math.floor(Date.now() / 1000).toString()
       const signature = signPayload(delivery.signing_secret, timestamp, body)
-      const response = await fetch(targetUrl, {
-        method: "POST",
-        headers: {
+      const response = await postPinnedWebhookRequest(
+        targetUrl,
+        pinnedAddress,
+        {
           "Content-Type": "application/json",
           "User-Agent": "MSGNEX-Webhooks/1.0",
           "X-MSGNEX-Event": delivery.event_type,
@@ -115,12 +143,13 @@ async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) 
           "X-MSGNEX-Signature": `sha256=${signature}`,
         },
         body,
-        signal: controller.signal,
-        redirect: "manual",
-      })
+        timeoutMs
+      )
 
       if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get("location")
+        const location = Array.isArray(response.headers.location)
+          ? response.headers.location[0]
+          : response.headers.location
         if (!location) {
           return {
             success: false,
@@ -135,16 +164,17 @@ async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) 
         }
 
         targetUrl = validateRedirectTarget(location, targetUrl)
-        targetUrl = await validateWebhookUrlForDelivery(targetUrl.toString())
+        const resolved = await resolveWebhookUrlForDelivery(targetUrl.toString())
+        targetUrl = resolved.url
+        pinnedAddress = resolved.pinnedAddress
         continue
       }
 
-      const responseBody = await readLimitedResponseBody(response).catch(() => "")
       return {
-        success: response.ok,
+        success: response.status >= 200 && response.status < 300,
         responseStatus: response.status,
-        responseBody,
-        error: response.ok ? "" : `Webhook HTTP ${response.status}`,
+        responseBody: response.body,
+        error: response.status >= 200 && response.status < 300 ? "" : `Webhook HTTP ${response.status}`,
       }
     }
 
@@ -156,13 +186,11 @@ async function postWebhook(delivery: ClaimedWebhookDelivery, timeoutMs: number) 
       responseBody: "",
       error: error instanceof WebhookUrlBlockedError ? WEBHOOK_URL_BLOCKED : "Webhook request failed",
     }
-  } finally {
-    clearTimeout(timeout)
   }
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!hasValidWorkerAuthorization(request)) {
     return NextResponse.json({ error: "Worker yetkisi gerekli" }, { status: 401 })
   }
 

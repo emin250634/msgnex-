@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { hasValidWorkerAuthorization } from "@/lib/security/worker-auth"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendCampaignWithCompanyProvider } from "@/services/company-sms-provider"
 
@@ -8,14 +9,8 @@ const requestSchema = z.object({
   staleTimeoutMinutes: z.number().int().min(5).max(1440).default(15),
 })
 
-function isAuthorized(request: Request): boolean {
-  const workerSecret = process.env.WORKER_SECRET
-  const authorization = request.headers.get("authorization")
-  return Boolean(workerSecret && authorization === `Bearer ${workerSecret}`)
-}
-
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!hasValidWorkerAuthorization(request)) {
     return NextResponse.json({ error: "Worker yetkisi gerekli" }, { status: 401 })
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { escapeHtml, sendTransactionalEmail } from "@/lib/email/transactional"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { getResetPasswordRedirectUrl } from "@/lib/utils/app-url"
 
 const OWNER_ROLE = "company_owner"
@@ -32,8 +33,7 @@ function buildCompanySalesNote(demo: Record<string, any>) {
 
   return rows.map(([label, value]) => `${label}: ${value}`).join("\n")
 }
-async function recordError(adminClient: any, id: string, error: unknown, extra: Record<string, unknown> = {}) {
-  const message = error instanceof Error ? error.message : "İşlem tamamlanamadı."
+async function recordError(adminClient: any, id: string, message: string, extra: Record<string, unknown> = {}) {
   await adminClient.from("demo_requests").update({ last_error: message, ...extra }).eq("id", id)
   return message
 }
@@ -175,9 +175,9 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
       message: "Firma oluşturuldu ve davet maili gönderildi.",
     })
   } catch (error) {
-    await recordError(adminClient, id, error, companyId ? { company_id: companyId } : {})
-    console.error("[admin-demo-requests:approve]", { requestId: id, companyId, error })
     const message = error instanceof DemoRequestSafeError ? error.message : "Demo talebi onaylanamadı."
+    await recordError(adminClient, id, message, companyId ? { company_id: companyId } : {})
+    console.error("[admin-demo-requests:approve]", { requestId: id, companyId, error })
     return errorResponse(message, 409)
   }
 }
@@ -217,7 +217,7 @@ async function rejectDemoRequest(auth: Awaited<ReturnType<typeof requireAdminAut
     if (updateError) throw new Error(updateError.message)
     return NextResponse.json({ request: updated, message: "Demo talebi reddedildi ve bilgilendirme maili gönderildi." })
   } catch (mailError) {
-    await recordError(adminClient, id, mailError)
+    await recordError(adminClient, id, "Demo talebi reddedilemedi.")
     console.error("[admin-demo-requests:reject]", { requestId: id, error: mailError })
     return errorResponse("Demo talebi reddedilemedi.", 500)
   }
@@ -235,6 +235,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   const auth = await requireAdminAuth()
   if (!auth.ok) return auth.response
 

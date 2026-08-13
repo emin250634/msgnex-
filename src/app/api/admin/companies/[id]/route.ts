@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
 import { writeAuditLog } from "@/lib/audit-log"
 import { isCompanyPlan } from "@/lib/plans"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 
 const SALES_STATUSES = ["new", "contacted", "pilot", "won", "lost"]
 
@@ -60,6 +61,9 @@ async function deleteUserIfOrphan(adminClient: any, userId: string, deletedCompa
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response
@@ -160,7 +164,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const auth = await requireAdminAuth()
     if (!auth.ok) return auth.response

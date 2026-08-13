@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminAuth } from "@/lib/auth/admin"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 
 const STATUSES = ["new", "contacted", "closed"] as const
 
@@ -52,6 +53,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   const auth = await requireAdminAuth()
   if (!auth.ok) return auth.response
 

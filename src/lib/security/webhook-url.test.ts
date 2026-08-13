@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  resolveWebhookUrlForDelivery,
   validateRedirectTarget,
   validateWebhookUrlForDelivery,
   WEBHOOK_URL_BLOCKED,
@@ -26,6 +27,13 @@ describe("webhook URL SSRF validator", () => {
     const url = await validateWebhookUrlForDelivery("https://example.com/webhook", resolver(["93.184.216.34"]))
 
     expect(url.toString()).toBe("https://example.com/webhook")
+  })
+
+  it("returns a pinned public address for delivery-time requests", async () => {
+    const result = await resolveWebhookUrlForDelivery("https://example.com/webhook", resolver(["93.184.216.34", "93.184.216.35"]))
+
+    expect(result.url.toString()).toBe("https://example.com/webhook")
+    expect(result.pinnedAddress).toBe("93.184.216.34")
   })
 
   it("normalizes uppercase hostnames and trailing dots", async () => {
@@ -114,10 +122,11 @@ describe("webhook URL SSRF validator", () => {
     expect(() => validateRedirectTarget("http://[::1", baseUrl)).toThrow(WebhookUrlBlockedError)
   })
 
-  it("allows standard HTTPS and 8443 while blocking unsafe explicit ports", async () => {
+  it("allows standard HTTPS and 8443 while blocking non-whitelisted explicit ports", async () => {
     await expect(validateWebhookUrlForDelivery("https://example.com:443/webhook", resolver(["93.184.216.34"]))).resolves.toBeInstanceOf(URL)
     await expect(validateWebhookUrlForDelivery("https://example.com:8443/webhook", resolver(["93.184.216.34"]))).resolves.toBeInstanceOf(URL)
     await expectBlocked("https://example.com:22/webhook")
     await expectBlocked("https://example.com:6379/webhook")
+    await expectBlocked("https://example.com:8080/webhook")
   })
 })

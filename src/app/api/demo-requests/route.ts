@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { assertSameOriginRequest } from "@/lib/security/request-origin"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { checkRateLimit, clientIpFromHeaders } from "@/lib/server-rate-limit"
 
@@ -20,6 +21,9 @@ function rateLimitedResponse(retryAfterSeconds: number) {
 }
 
 export async function POST(request: NextRequest) {
+  const originError = assertSameOriginRequest(request)
+  if (originError) return originError
+
   try {
     const body = await request.json()
     if (clean(body.website, 200)) {

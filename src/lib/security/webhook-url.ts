@@ -9,22 +9,6 @@ export const MAX_WEBHOOK_RESPONSE_BODY_BYTES = 16 * 1024
 
 const BLOCKED_HOST_SUFFIXES = [".localhost", ".local", ".internal"]
 const ALLOWED_EXPLICIT_HTTPS_PORTS = new Set(["443", "8443"])
-const BLOCKED_EXPLICIT_PORTS = new Set([
-  "22",
-  "23",
-  "25",
-  "110",
-  "143",
-  "3306",
-  "5432",
-  "6379",
-  "9200",
-  "9300",
-  "11211",
-  "2375",
-  "2376",
-  "27017",
-])
 
 export class WebhookUrlBlockedError extends Error {
   readonly code = WEBHOOK_URL_BLOCKED
@@ -39,6 +23,11 @@ export interface WebhookUrlResolver {
   lookup(hostname: string): Promise<string[]>
 }
 
+export interface ResolvedWebhookUrl {
+  url: URL
+  pinnedAddress: string
+}
+
 export const nodeWebhookUrlResolver: WebhookUrlResolver = {
   async lookup(hostname: string) {
     const records = await lookup(hostname, { all: true, verbatim: true })
@@ -50,6 +39,13 @@ export async function validateWebhookUrlForDelivery(
   value: string,
   resolver: WebhookUrlResolver = nodeWebhookUrlResolver
 ): Promise<URL> {
+  return (await resolveWebhookUrlForDelivery(value, resolver)).url
+}
+
+export async function resolveWebhookUrlForDelivery(
+  value: string,
+  resolver: WebhookUrlResolver = nodeWebhookUrlResolver
+): Promise<ResolvedWebhookUrl> {
   const url = parseWebhookUrl(value)
   const hostname = normalizeHostname(url.hostname)
   validateHostname(hostname)
@@ -57,7 +53,7 @@ export async function validateWebhookUrlForDelivery(
   const literalIp = parseIpLiteral(hostname)
   if (literalIp) {
     assertPublicIp(literalIp)
-    return url
+    return { url, pinnedAddress: literalIp }
   }
 
   let addresses: string[]
@@ -75,7 +71,7 @@ export async function validateWebhookUrlForDelivery(
     assertPublicIp(address)
   }
 
-  return url
+  return { url, pinnedAddress: addresses[0] }
 }
 
 export function parseWebhookUrl(value: string): URL {
@@ -123,9 +119,7 @@ function validatePort(url: URL) {
   }
 
   if (ALLOWED_EXPLICIT_HTTPS_PORTS.has(url.port)) return
-  if (port < 1024 || BLOCKED_EXPLICIT_PORTS.has(url.port)) {
-    throw new WebhookUrlBlockedError("Webhook URL port is not allowed")
-  }
+  throw new WebhookUrlBlockedError("Webhook URL port is not allowed")
 }
 
 function normalizeHostname(hostname: string) {
