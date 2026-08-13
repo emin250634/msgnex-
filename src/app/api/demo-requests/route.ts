@@ -34,12 +34,6 @@ export async function POST(request: NextRequest) {
     const hasSmsProvider = clean(body.has_sms_provider, 20)
     const smsProviderName = clean(body.sms_provider_name, 120)
     const message = clean(body.message, 1500)
-    const clientIp = clientIpFromHeaders(request.headers)
-    const ipLimit = checkRateLimit({
-      key: `demo-request:ip:${clientIp}`,
-      limit: DEMO_REQUEST_IP_LIMIT,
-      windowMs: DEMO_REQUEST_WINDOW_MS,
-    })
 
     if (!fullName || !companyName || !phone || !email || !monthlySmsVolume || !hasSmsProvider) {
       return NextResponse.json({ error: "Zorunlu alanları eksiksiz doldurun." }, { status: 400 })
@@ -50,10 +44,16 @@ export async function POST(request: NextRequest) {
     if (!PROVIDER_STATUSES.includes(hasSmsProvider)) {
       return NextResponse.json({ error: "SMS sağlayıcı bilgisi geçersiz." }, { status: 400 })
     }
+    const clientIp = clientIpFromHeaders(request.headers)
+    const ipLimit = await checkRateLimit({
+      key: `demo-request:ip:${clientIp}`,
+      limit: DEMO_REQUEST_IP_LIMIT,
+      windowMs: DEMO_REQUEST_WINDOW_MS,
+    })
     if (!ipLimit.allowed) {
       return rateLimitedResponse(ipLimit.retryAfterSeconds)
     }
-    const emailLimit = checkRateLimit({
+    const emailLimit = await checkRateLimit({
       key: `demo-request:email:${email}`,
       limit: DEMO_REQUEST_EMAIL_LIMIT,
       windowMs: DEMO_REQUEST_WINDOW_MS,

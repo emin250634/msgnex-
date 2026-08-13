@@ -16,7 +16,7 @@ function rateLimitedResponse(retryAfterSeconds: number) {
 
 export async function POST(request: NextRequest) {
   try {
-    const ipLimit = checkRateLimit({
+    const ipLimit = await checkRateLimit({
       key: `accept-invitation:ip:${clientIpFromHeaders(request.headers)}`,
       limit: INVITATION_IP_LIMIT,
       windowMs: INVITATION_WINDOW_MS,
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     if (authError || !user?.email) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
-    const userLimit = checkRateLimit({
+    const userLimit = await checkRateLimit({
       key: `accept-invitation:user:${user.id}`,
       limit: INVITATION_USER_LIMIT,
       windowMs: INVITATION_WINDOW_MS,

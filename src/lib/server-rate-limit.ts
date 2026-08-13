@@ -1,16 +1,18 @@
+import { isIP } from "node:net"
+import { createAdminClient } from "./supabase/admin"
+
 type RateLimitOptions = {
   key: string
   limit: number
   windowMs: number
-  now?: number
 }
 
-type RateLimitEntry = {
-  count: number
-  resetAt: number
+type RateLimitRpcClient = {
+  rpc: (
+    fn: "rate_limit_check",
+    args: { p_key: string; p_limit: number; p_window_ms: number }
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>
 }
-
-const buckets = new Map<string, RateLimitEntry>()
 
 export type RateLimitResult = {
   allowed: boolean
@@ -19,45 +21,55 @@ export type RateLimitResult = {
   retryAfterSeconds: number
 }
 
-export function checkRateLimit({ key, limit, windowMs, now = Date.now() }: RateLimitOptions): RateLimitResult {
-  const current = buckets.get(key)
+type RateLimitRpcRow = {
+  allowed?: unknown
+  limit_value?: unknown
+  remaining?: unknown
+  retry_after_seconds?: unknown
+}
 
-  if (!current || current.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs })
-    return {
-      allowed: true,
-      limit,
-      remaining: Math.max(limit - 1, 0),
-      retryAfterSeconds: 0,
-    }
+function normalizeRateLimitResult(data: unknown): RateLimitResult {
+  const row = (Array.isArray(data) ? data[0] : data) as RateLimitRpcRow | undefined
+
+  if (!row || typeof row.allowed !== "boolean") {
+    throw new Error("Invalid rate limit response")
   }
 
-  if (current.count >= limit) {
-    return {
-      allowed: false,
-      limit,
-      remaining: 0,
-      retryAfterSeconds: Math.max(Math.ceil((current.resetAt - now) / 1000), 1),
-    }
-  }
-
-  current.count += 1
   return {
-    allowed: true,
-    limit,
-    remaining: Math.max(limit - current.count, 0),
-    retryAfterSeconds: 0,
+    allowed: row.allowed,
+    limit: Number(row.limit_value ?? 0),
+    remaining: Number(row.remaining ?? 0),
+    retryAfterSeconds: Number(row.retry_after_seconds ?? 0),
   }
 }
 
-export function clearRateLimitBuckets() {
-  buckets.clear()
+export async function checkRateLimit(
+  { key, limit, windowMs }: RateLimitOptions,
+  rpcClient: RateLimitRpcClient = createAdminClient()
+): Promise<RateLimitResult> {
+  const { data, error } = await rpcClient.rpc("rate_limit_check", {
+    p_key: key,
+    p_limit: limit,
+    p_window_ms: windowMs,
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return normalizeRateLimitResult(data)
+}
+
+function trustedProxyHeaderName() {
+  return (process.env.TRUSTED_PROXY_HEADER || "x-forwarded-for").trim().toLowerCase()
+}
+
+function firstHeaderValue(value: string | null) {
+  return value?.split(",")[0]?.trim() || ""
 }
 
 export function clientIpFromHeaders(headers: Headers) {
-  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-  const realIp = headers.get("x-real-ip")?.trim()
-  const cfIp = headers.get("cf-connecting-ip")?.trim()
+  const candidate = firstHeaderValue(headers.get(trustedProxyHeaderName()))
 
-  return forwardedFor || realIp || cfIp || "unknown"
+  return isIP(candidate) ? candidate : "unknown"
 }
