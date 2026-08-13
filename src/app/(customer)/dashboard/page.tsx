@@ -53,6 +53,17 @@ function campaignStatusTone(status: string) {
   return "info" as const
 }
 
+type DashboardSummary = Record<string, any>
+
+function numberValue(value: unknown) {
+  const number = Number(value ?? 0)
+  return Number.isFinite(number) ? number : 0
+}
+
+function arrayValue<T = any>(value: unknown): T[] {
+  return Array.isArray(value) ? value : []
+}
+
 function MiniTrend({ tone = "blue" }: { tone?: "blue" | "green" | "orange" | "purple" }) {
   const colors = {
     blue: "bg-blue-500",
@@ -128,142 +139,51 @@ export default async function CustomerDashboard() {
   let recentCampaigns: any[] = []
 
   if (activeCompanyId) {
-    const last30Start = new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString()
+    const { data: summaryData, error: summaryError } = await supabase.rpc("get_customer_dashboard_summary")
+    if (summaryError) {
+      console.error("[customer-dashboard:summary]", { userId: user.id, companyId: activeCompanyId, error: summaryError })
+    }
 
-    const { data: company } = await supabase
-      .from("companies")
-      .select("name, plan")
-      .eq("id", activeCompanyId)
-      .single()
-    companyName = company?.name || "-"
-    companyPlan = (company?.plan as CompanyPlan | null) || "starter"
+    const summary = (summaryData ?? {}) as DashboardSummary
+    const company = summary.company ?? {}
+    const provider = summary.provider ?? {}
+    const contacts = summary.contacts ?? {}
+    const segments = summary.segments ?? {}
+    const campaigns = summary.campaigns ?? {}
+    const messages = summary.messages ?? {}
 
-    const { data: providerRows } = await supabase.rpc("get_customer_provider_status")
-    const provider = providerRows?.[0]
-    providerName = provider?.provider_name || "Netgsm"
-    providerConnectionStatus = provider?.connection_status || "not_configured"
-    providerSenderHeader = provider?.sender_header || null
-    providerSenderHeaderStatus = provider?.sender_header_status || "unknown"
-    providerBalance = typeof provider?.balance === "number" ? provider.balance : provider?.balance ? Number(provider.balance) : null
-    providerBalanceUnit = provider?.balance_unit || "sms"
-    providerLastSyncedAt = provider?.last_synced_at || null
-    providerReady = Boolean(provider?.has_provider && provider.sender_header && provider.connection_status !== "disabled")
+    companyName = company.name || "-"
+    companyPlan = (company.plan as CompanyPlan | null) || "starter"
+    providerName = provider.provider_name || "Netgsm"
+    providerConnectionStatus = provider.connection_status || "not_configured"
+    providerSenderHeader = provider.sender_header || null
+    providerSenderHeaderStatus = provider.sender_header_status || "unknown"
+    providerBalance = provider.balance === null || provider.balance === undefined ? null : numberValue(provider.balance)
+    providerBalanceUnit = provider.balance_unit || "sms"
+    providerLastSyncedAt = provider.last_synced_at || null
+    providerReady = Boolean(provider.has_provider && provider.sender_header && provider.connection_status !== "disabled")
     providerStatus = providerReady ? "Hazır" : "Kurulum bekliyor"
-
-    const [
-      { count: contactsTotal },
-      { count: optedInTotal },
-      { count: optedOutTotal },
-      { count: unknownConsentTotal },
-      { count: suppressionTotal },
-    ] = await Promise.all([
-      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId),
-      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("consent_status", "opted_in"),
-      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("consent_status", "opted_out"),
-      supabase.from("contacts").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("consent_status", "unknown"),
-      supabase.from("suppression_list").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId),
-    ])
-    contactCount = contactsTotal ?? 0
-    optedInCount = optedInTotal ?? 0
-    optedOutCount = optedOutTotal ?? 0
-    unknownConsentCount = unknownConsentTotal ?? 0
-    suppressionCount = suppressionTotal ?? 0
-
-    const { data: crmContacts } = await supabase
-      .from("contacts")
-      .select("group_id,email")
-      .eq("company_id", activeCompanyId)
-
-    const { data: crmGroups } = await supabase
-      .from("groups")
-      .select("id,name")
-      .eq("company_id", activeCompanyId)
-
-    segmentCount = crmGroups?.length ?? 0
-    const vipGroupIds = new Set((crmGroups ?? [])
-      .filter((group) => String(group.name || "").toLowerCase().includes("vip"))
-      .map((group) => group.id))
-    vipCustomerCount = (crmContacts ?? []).filter((contact) => contact.group_id && vipGroupIds.has(contact.group_id)).length
-    emailCustomerCount = (crmContacts ?? []).filter((contact) => Boolean(contact.email)).length
-
-    const { count: campaignsTotal } = await supabase
-      .from("sms_campaigns")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
-    campaignCount = campaignsTotal ?? 0
-
-    const { count: campaignsLast30 } = await supabase
-      .from("sms_campaigns")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
-      .gte("created_at", last30Start)
-    campaignsLast30Count = campaignsLast30 ?? 0
-
-    const { count: awaitingDlr } = await supabase
-      .from("sms_campaigns")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
-      .eq("provider_status", "awaiting_dlr")
-    awaitingDlrCount = awaitingDlr ?? 0
-
-    const { count: providerFailed } = await supabase
-      .from("sms_campaigns")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
-      .eq("provider_status", "failed")
-    providerFailedCount = providerFailed ?? 0
-
-    const { count: reviewRequired } = await supabase
-      .from("sms_campaigns")
-      .select("*", { count: "exact", head: true })
-      .eq("company_id", activeCompanyId)
-      .eq("status", "review_required")
-    reviewRequiredCount = reviewRequired ?? 0
-
-    const [
-      { count: messagesLast30 },
-      { count: sentMessagesLast30 },
-      { count: deliveredMessagesLast30 },
-      { count: failedMessagesLast30 },
-      { count: pendingMessagesLast30 },
-    ] = await Promise.all([
-      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).gte("created_at", last30Start),
-      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "sent").gte("created_at", last30Start),
-      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "delivered").gte("created_at", last30Start),
-      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "failed").gte("created_at", last30Start),
-      supabase.from("sms_messages").select("*", { count: "exact", head: true }).eq("company_id", activeCompanyId).eq("status", "pending").gte("created_at", last30Start),
-    ])
-    messagesLast30Count = messagesLast30 ?? 0
-    sentMessagesLast30Count = sentMessagesLast30 ?? 0
-    deliveredMessagesLast30Count = deliveredMessagesLast30 ?? 0
-    failedMessagesLast30Count = failedMessagesLast30 ?? 0
-    pendingMessagesLast30Count = pendingMessagesLast30 ?? 0
-
-    const { data: messages } = await supabase
-      .from("sms_messages")
-      .select("*")
-      .eq("company_id", activeCompanyId)
-      .order("created_at", { ascending: false })
-      .limit(6)
-    recentMessages = messages ?? []
-
-    const { data: failedMessages } = await supabase
-      .from("sms_messages")
-      .select("*")
-      .eq("company_id", activeCompanyId)
-      .eq("status", "failed")
-      .order("created_at", { ascending: false })
-      .limit(4)
-    recentFailedMessages = failedMessages ?? []
-
-    const { data: campaigns } = await supabase
-      .from("sms_campaigns")
-      .select("*")
-      .eq("company_id", activeCompanyId)
-      .order("created_at", { ascending: false })
-      .limit(5)
-    recentCampaigns = campaigns ?? []
-
+    contactCount = numberValue(contacts.total)
+    optedInCount = numberValue(contacts.opted_in)
+    optedOutCount = numberValue(contacts.opted_out)
+    unknownConsentCount = numberValue(contacts.unknown_consent)
+    suppressionCount = numberValue(contacts.suppression)
+    segmentCount = numberValue(segments.total)
+    vipCustomerCount = numberValue(segments.vip_customers)
+    emailCustomerCount = numberValue(contacts.email_customers)
+    campaignCount = numberValue(campaigns.total)
+    campaignsLast30Count = numberValue(campaigns.last30)
+    awaitingDlrCount = numberValue(campaigns.awaiting_dlr)
+    providerFailedCount = numberValue(campaigns.provider_failed)
+    reviewRequiredCount = numberValue(campaigns.review_required)
+    messagesLast30Count = numberValue(messages.last30)
+    sentMessagesLast30Count = numberValue(messages.sent_last30)
+    deliveredMessagesLast30Count = numberValue(messages.delivered_last30)
+    failedMessagesLast30Count = numberValue(messages.failed_last30)
+    pendingMessagesLast30Count = numberValue(messages.pending_last30)
+    recentMessages = arrayValue(summary.recent_messages)
+    recentFailedMessages = arrayValue(summary.recent_failed_messages)
+    recentCampaigns = arrayValue(summary.recent_campaigns)
   }
 
   const successRate = percent(sentMessagesLast30Count + deliveredMessagesLast30Count, messagesLast30Count)
