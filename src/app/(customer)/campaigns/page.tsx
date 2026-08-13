@@ -42,7 +42,6 @@ import {
   ProviderErrorInline,
   ReportMetric,
   Select,
-  SummaryBox,
 } from "./campaign-detail-components"
 import {
   getPhoneFormatIssue,
@@ -58,6 +57,7 @@ import {
   downloadTextFile,
   fileSafeDate,
 } from "./campaign-reports"
+import { CampaignFilters } from "./campaign-filters"
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<SmsCampaign[]>([])
@@ -464,71 +464,31 @@ export default function CampaignsPage() {
           Kuyruktaki kampanyaları iptal edebilirsiniz. Gönderilmeye başlanmış kampanyalar çift SMS riskini önlemek için otomatik tekrar gönderilmez.
         </div>
 
-        <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
-            <Input
-              placeholder="Kampanya adı, mesaj, provider veya segment ara..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <Button variant="secondary" onClick={() => setShowFilters(!showFilters)}>
-              {showFilters ? "Filtreleri Gizle" : "Filtreler"}
-            </Button>
-            <Button variant="secondary" onClick={clearFilters} disabled={!hasActiveFilters}>
-              Filtreleri Temizle
-            </Button>
-          </div>
-
-          {showFilters && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" onClick={() => applyDatePreset("today")}>Bugün</Button>
-                <Button variant="secondary" size="sm" onClick={() => applyDatePreset("last7")}>Son 7 Gün</Button>
-                <Button variant="secondary" size="sm" onClick={() => applyDatePreset("last30")}>Son 30 Gün</Button>
-                <Button variant="secondary" size="sm" onClick={() => applyDatePreset("month")}>Bu Ay</Button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                <Select value={statusFilter} onChange={(value) => setStatusFilter(value as CampaignStatusFilter)}>
-                  <option value="all">Tüm durumlar</option>
-                  {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </Select>
-                <Select value={providerFilter} onChange={setProviderFilter}>
-                  <option value="all">Tüm providerlar</option>
-                  {providerOptions.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
-                </Select>
-                <Select value={dlrFilter} onChange={(value) => setDlrFilter(value as DlrFilter)}>
-                  <option value="all">Tüm DLR</option>
-                  <option value="awaiting">DLR bekleyen</option>
-                  <option value="checked">DLR kontrol edildi</option>
-                  <option value="completed">DLR tamamlandı</option>
-                  <option value="none">DLR yok</option>
-                </Select>
-                <Select value={groupFilter} onChange={setGroupFilter}>
-                  <option value="all">Tüm segmentler</option>
-                  <option value="none">Segmentsiz</option>
-                  {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                </Select>
-                <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-                <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-            <SummaryBox title="Kampanya" value={filteredCampaigns.length} />
-            <SummaryBox title="Alıcı" value={filteredSummary.totalRecipients} />
-            <SummaryBox title="Başarılı" value={filteredSummary.success} tone="success" />
-            <SummaryBox title="Hatalı" value={filteredSummary.failed} tone="danger" />
-            <SummaryBox title="Bekleyen" value={filteredSummary.pending} tone="warning" />
-            <SummaryBox title="Hata Oranı" value={`%${filteredSummary.failureRate}`} tone={filteredSummary.failed > 0 ? "danger" : "success"} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-            <StatusBadge label={`${filteredCampaigns.length} sonuç`} tone="info" />
-            {filteredSummary.skippedRecipients > 0 && <StatusBadge label={`${filteredSummary.skippedRecipients} atlandı`} tone="warning" />}
-            <span>Son 100 kampanya içinde filtreleniyor.</span>
-          </div>
-        </div>
+        <CampaignFilters
+          search={search}
+          statusFilter={statusFilter}
+          providerFilter={providerFilter}
+          dlrFilter={dlrFilter}
+          groupFilter={groupFilter}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          showFilters={showFilters}
+          hasActiveFilters={hasActiveFilters}
+          resultCount={filteredCampaigns.length}
+          providerOptions={providerOptions}
+          groups={groups}
+          summary={filteredSummary}
+          onSearchChange={setSearch}
+          onStatusFilterChange={setStatusFilter}
+          onProviderFilterChange={setProviderFilter}
+          onDlrFilterChange={setDlrFilter}
+          onGroupFilterChange={setGroupFilter}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+          onToggleFilters={() => setShowFilters(!showFilters)}
+          onClearFilters={clearFilters}
+          onApplyDatePreset={applyDatePreset}
+        />
 
         <div className="space-y-3 lg:hidden">
           {filteredCampaigns.length > 0 ? filteredCampaigns.map((campaign) => {
