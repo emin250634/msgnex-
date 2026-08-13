@@ -16,196 +16,39 @@ import { getProviderErrorInfo, providerErrorSummary } from "@/lib/provider-error
 import { calculateSmsSegments } from "@/lib/sms-segments"
 import { createClient } from "@/lib/supabase/client"
 import type { Group, SmsCampaign, SmsMessage } from "@/types"
-
-type CampaignStatusFilter = "all" | SmsCampaign["status"]
-type DlrFilter = "all" | "awaiting" | "checked" | "completed" | "none"
-
-const statusLabels: Record<SmsCampaign["status"], string> = {
-  draft: "Taslak",
-  queued: "Kuyrukta",
-  scheduled: "Planlandı",
-  sending: "Gönderiliyor",
-  completed: "Tamamlandı",
-  failed: "Hata",
-  cancelled: "İptal Edildi",
-  review_required: "İnceleme Gerekli",
-}
-
-const statusClasses: Record<SmsCampaign["status"], string> = {
-  draft: "bg-gray-100 text-gray-700",
-  queued: "bg-blue-100 text-blue-700",
-  scheduled: "bg-purple-100 text-purple-700",
-  sending: "bg-amber-100 text-amber-700",
-  completed: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
-  cancelled: "bg-gray-100 text-gray-700",
-  review_required: "bg-orange-100 text-orange-700",
-}
-
-function providerStatusLabel(status?: string | null) {
-  if (!status) return "Yok"
-  const labels: Record<string, string> = {
-    awaiting_dlr: "DLR bekleniyor",
-    delivered: "Teslim edildi",
-    partially_delivered: "Kısmi teslim",
-    partially_submitted: "Kısmi gönderim",
-    failed: "Provider hata",
-    delivery_after_refund_review: "İnceleme",
-  }
-  return labels[status] || status
-}
-
-function providerStatusTone(status?: string | null) {
-  if (!status) return "neutral" as const
-  if (status === "delivered") return "success" as const
-  if (status === "failed") return "danger" as const
-  if (status.includes("review") || status.includes("partial")) return "warning" as const
-  return "info" as const
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "-"
-  return new Date(value).toLocaleString("tr-TR")
-}
-
-function shortId(value?: string | null) {
-  if (!value) return "-"
-  return value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : value
-}
-
-function dateOnly(value?: string | null) {
-  if (!value) return ""
-  return value.slice(0, 10)
-}
-
-function toDateInputValue(date: Date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function monthStartInputValue(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`
-}
-
-function estimatedProviderUnits(campaign: SmsCampaign) {
-  return campaign.total_recipients * calculateSmsSegments(campaign.message).segments
-}
-
-interface PhoneFormatIssue {
-  type: string
-  title: string
-  description: string
-  action: string
-  severity: "info" | "warning"
-}
-
-function getPhoneFormatIssue(recipient?: string | null): PhoneFormatIssue | null {
-  const value = (recipient || "").trim()
-  const digits = value.replace(/\D/g, "")
-
-  if (!value) {
-    return {
-      type: "empty",
-      title: "Boş numara",
-      description: "Alıcı numarası boş görünüyor.",
-      action: "Kişi kaydına geçerli bir cep telefonu ekleyin.",
-      severity: "warning",
-    }
-  }
-
-  if (/[a-zA-ZğüşöçıİĞÜŞÖÇ]/.test(value)) {
-    return {
-      type: "letters",
-      title: "Harf içeren numara",
-      description: "Telefon alanında harf veya açıklama metni var.",
-      action: "Telefon alanını sadece rakamlardan oluşacak şekilde temizleyin.",
-      severity: "warning",
-    }
-  }
-
-  if (digits.length < 10) {
-    return {
-      type: "short",
-      title: "Eksik haneli numara",
-      description: "Cep telefonu için gerekli 10 hane tamamlanmamış.",
-      action: "Eksik kayıtları müşteri listenizde düzeltin veya gönderimden çıkarın.",
-      severity: "warning",
-    }
-  }
-
-  if (digits.length > 12) {
-    return {
-      type: "long",
-      title: "Fazla haneli numara",
-      description: "Telefon alanında ek rakamlar veya birleşmiş birden fazla numara olabilir.",
-      action: "Numarayı tek cep telefonu olacak şekilde ayırın ve 5XXXXXXXXX formatına indirin.",
-      severity: "warning",
-    }
-  }
-
-  if (digits.length === 12 && digits.startsWith("90")) {
-    return {
-      type: "country_code",
-      title: "+90 / 90 ile başlayan numara",
-      description: "Numara Türkiye ülke kodu ile kaydedilmiş.",
-      action: "Listeyi standart 5XXXXXXXXX formatına normalize edin.",
-      severity: "info",
-    }
-  }
-
-  if (digits.length === 11 && digits.startsWith("0")) {
-    return {
-      type: "leading_zero",
-      title: "0 ile başlayan numara",
-      description: "Numara başında yerel arama sıfırı var.",
-      action: "Başındaki 0 kaldırılarak 5XXXXXXXXX formatında saklayın.",
-      severity: "info",
-    }
-  }
-
-  if (digits.length === 10 && !digits.startsWith("5")) {
-    return {
-      type: "not_mobile",
-      title: "Mobil olmayan format",
-      description: "Türkiye cep telefonu formatı 5 ile başlamalıdır.",
-      action: "Sabit hat veya hatalı kayıtları kişi listesinden ayırın.",
-      severity: "warning",
-    }
-  }
-
-  if (digits.length === 10 && digits.startsWith("5") && /[^\d]/.test(value)) {
-    return {
-      type: "separators",
-      title: "Ayraç içeren numara",
-      description: "Numara doğru görünüyor ancak boşluk, parantez veya tire içeriyor.",
-      action: "Veri kalitesi için telefonları sadece rakam olarak saklayın.",
-      severity: "info",
-    }
-  }
-
-  return null
-}
-
-function phoneIssueSummary(recipient?: string | null) {
-  return getPhoneFormatIssue(recipient)?.title || "Standart format"
-}
-
-function isSuppressionCandidate(message: SmsMessage) {
-  const issue = getPhoneFormatIssue(message.recipient)
-  const providerCode = message.provider_status_code
-  const numberErrorCodes = new Set(["50", "51", "52", "INVALID_RECIPIENT"])
-
-  return Boolean(
-    issue?.severity === "warning" ||
-    (providerCode && numberErrorCodes.has(providerCode))
-  )
-}
-
-function normalizePhoneForCompare(phone?: string | null) {
-  const digits = (phone || "").replace(/\D/g, "")
-  if (digits.length === 12 && digits.startsWith("90")) return digits.slice(2)
-  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1)
-  return digits
-}
+import {
+  campaignReuseHref,
+  type CampaignStatusFilter,
+  type DlrFilter,
+  estimatedProviderUnits,
+  formatDate,
+  matchesDateRange,
+  matchesDlr,
+  monthStartInputValue,
+  percent,
+  providerStatusLabel,
+  providerStatusTone,
+  shortId,
+  statusClasses,
+  statusLabels,
+  toDateInputValue,
+} from "./campaign-utils"
+import {
+  CancelMetric,
+  CleanupAction,
+  ProviderErrorBox,
+  ProviderErrorInline,
+  ReportMetric,
+  Select,
+  SummaryBox,
+} from "./campaign-detail-components"
+import {
+  getPhoneFormatIssue,
+  isSuppressionCandidate,
+  normalizePhoneForCompare,
+  phoneIssueSummary,
+  type PhoneFormatIssue,
+} from "./campaign-phone"
 
 function csvValue(value: unknown) {
   const text = value === null || value === undefined ? "" : String(value)
@@ -464,38 +307,6 @@ function buildCampaignReportHtml(campaign: SmsCampaign, messages: SmsMessage[]) 
   </table>
 </body>
 </html>`
-}
-
-function matchesDateRange(value: string, from: string, to: string) {
-  const date = dateOnly(value)
-  if (from && date < from) return false
-  if (to && date > to) return false
-  return true
-}
-
-function matchesDlr(campaign: SmsCampaign, filter: DlrFilter) {
-  if (filter === "all") return true
-  if (filter === "awaiting") return campaign.provider_status === "awaiting_dlr"
-  if (filter === "checked") return Boolean(campaign.dlr_last_checked_at)
-  if (filter === "completed") return Boolean(campaign.dlr_completed_at)
-  if (filter === "none") return !campaign.dlr_last_checked_at && !campaign.dlr_completed_at
-  return true
-}
-
-function percent(part: number, total: number) {
-  if (total <= 0) return 0
-  return Math.round((part / total) * 100)
-}
-
-function campaignReuseHref(campaign: SmsCampaign) {
-  const params = new URLSearchParams({
-    source: "campaign-copy",
-    message: campaign.message,
-  })
-
-  if (campaign.group_id) params.set("group", campaign.group_id)
-
-  return `/sms?${params.toString()}`
 }
 
 export default function CampaignsPage() {
@@ -1408,51 +1219,6 @@ export default function CampaignsPage() {
   )
 }
 
-function CleanupAction({
-  title,
-  description,
-  action,
-  onClick,
-  disabled = false,
-  primary = false,
-}: {
-  title: string
-  description: string
-  action: string
-  onClick: () => void
-  disabled?: boolean
-  primary?: boolean
-}) {
-  return (
-    <div className="flex h-full flex-col justify-between rounded-xl border border-red-100 bg-white p-4">
-      <div>
-        <p className="text-sm font-semibold text-gray-950">{title}</p>
-        <p className="mt-2 text-xs leading-5 text-gray-600">{description}</p>
-      </div>
-      <Button className="mt-4 w-full" variant={primary ? "primary" : "secondary"} size="sm" onClick={onClick} disabled={disabled}>
-        {action}
-      </Button>
-    </div>
-  )
-}
-
-function Select({ value, onChange, children }: { value: string; onChange: (value: string) => void; children: React.ReactNode }) {
-  return (
-    <select value={value} onChange={(event) => onChange(event.target.value)} className="block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500">
-      {children}
-    </select>
-  )
-}
-
-function CancelMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <p className="text-xs font-semibold uppercase text-gray-500">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-gray-950">{value}</p>
-    </div>
-  )
-}
-
 function messageStatusLabel(status: SmsMessage["status"]) {
   if (status === "delivered") return "Teslim edildi"
   if (status === "sent") return "Gönderildi"
@@ -1464,72 +1230,6 @@ function messageStatusTone(status: SmsMessage["status"]) {
   if (status === "delivered" || status === "sent") return "success" as const
   if (status === "failed") return "danger" as const
   return "warning" as const
-}
-
-function ReportMetric({ label, value, tone = "slate" }: { label: string; value: string; tone?: "slate" | "emerald" | "red" | "amber" }) {
-  const classes = {
-    slate: "border-gray-200 bg-white text-gray-950",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    red: "border-red-200 bg-red-50 text-red-950",
-    amber: "border-amber-200 bg-amber-50 text-amber-950",
-  }
-
-  return (
-    <div className={`rounded-xl border p-4 ${classes[tone]}`}>
-      <p className="text-xs font-semibold uppercase opacity-70">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
-    </div>
-  )
-}
-
-function SummaryBox({ title, value, tone = "neutral" }: { title: string; value: number | string; tone?: "neutral" | "success" | "danger" | "warning" }) {
-  const classes = {
-    neutral: "border-gray-200 bg-white text-gray-950",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    danger: "border-red-200 bg-red-50 text-red-950",
-    warning: "border-amber-200 bg-amber-50 text-amber-950",
-  }
-
-  return (
-    <div className={`rounded-lg border p-3 ${classes[tone]}`}>
-      <p className="text-xs font-semibold uppercase opacity-70">{title}</p>
-      <p className="mt-1 text-xl font-semibold">{typeof value === "number" ? value.toLocaleString("tr-TR") : value}</p>
-    </div>
-  )
-}
-
-function ProviderErrorBox({ code, count, info }: { code: string; count: number; info: ReturnType<typeof getProviderErrorInfo> }) {
-  if (!info) return null
-
-  const classes = {
-    warning: "border-amber-200 bg-white text-amber-950",
-    danger: "border-red-200 bg-white text-red-950",
-    info: "border-blue-200 bg-white text-blue-950",
-  }
-
-  return (
-    <div className={`rounded-lg border p-3 ${classes[info.severity]}`}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-xs font-semibold">{code}</p>
-        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">{count} kayıt</span>
-      </div>
-      <p className="mt-2 text-sm font-semibold">{info.title}</p>
-      <p className="mt-1 text-xs leading-5 opacity-80">{info.description}</p>
-      <p className="mt-2 text-xs font-medium">{info.action}</p>
-    </div>
-  )
-}
-
-function ProviderErrorInline({ providerName, code }: { providerName?: string | null; code?: string | null }) {
-  const info = getProviderErrorInfo(providerName, code)
-  if (!info) return <span className="text-xs text-gray-500">-</span>
-
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-950">{info.title}</p>
-      <p className="mt-1 text-xs leading-5 text-gray-500">{info.action}</p>
-    </div>
-  )
 }
 
 function PhoneIssueBox({ issue, count, examples }: { issue: PhoneFormatIssue; count: number; examples: string[] }) {
