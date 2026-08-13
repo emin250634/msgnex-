@@ -191,6 +191,7 @@ Başlanan işler:
   - izinli kişiler, doğum günü yaklaşanlar, segmentsizler ve SMS geçmişi olanlar segment ekranında kural kartı olarak gösterilir
   - dinamik kural kartları kişi listesini doğrudan filtreler
   - dinamik kural hedef kitlesi SMS gönder ekranına manuel alıcı listesi olarak aktarılabilir
+  - dinamik kural veya şablondan gelen çalışmalar için taslak adı otomatik önerilir
 
 Yapılacaklar:
 

@@ -33,6 +33,7 @@ function categoryLabel(value?: string | null) {
 function templateSmsHref(template: SmsTemplate) {
   const params = new URLSearchParams({
     source: "template",
+    templateName: template.name,
     message: template.message,
   })
 

@@ -112,6 +112,7 @@ export default function SmsPage() {
     const prefillMessage = params.get("message")
     const prefillGroup = params.get("group")
     const source = params.get("source")
+    const templateName = params.get("templateName")
     let handledPrefill = false
 
     if (source === "segment-rule") {
@@ -121,6 +122,7 @@ export default function SmsPage() {
         if (Array.isArray(storedRecipients) && storedRecipients.length > 0) {
           setSelectedGroup(NO_SEGMENT)
           setManualNumbers(storedRecipients.map(String).join("\n"))
+          setDraftName(`${ruleName} - ${new Date().toLocaleDateString("tr-TR")}`)
           setPrefillNotice(`${ruleName} hedef kitlesi manuel alıcı olarak hazırlandı. Gönderim öncesi kontroller uygulanacaktır.`)
           handledPrefill = true
         }
@@ -141,6 +143,7 @@ export default function SmsPage() {
     if (source === "campaign-copy") {
       setPrefillNotice("Önceki kampanya içeriği hazırlandı. Alıcıları ve mesajı kontrol edip yeniden gönderebilirsiniz.")
     } else if (source === "template") {
+      if (templateName) setDraftName(`${templateName} kampanyası`)
       setPrefillNotice("Seçilen şablon mesaj alanına aktarıldı. Alıcıları seçip gönderimi inceleyebilirsiniz.")
     }
     window.history.replaceState(null, "", "/sms")
@@ -490,7 +493,7 @@ export default function SmsPage() {
             <p className="mt-1 text-xs leading-5 text-blue-800">
               {activeDraft
                 ? "Yüklenen taslağı güncelleyebilir veya mevcut çalışmayı yeni taslak olarak saklayabilirsiniz."
-                : "Mesaj, alıcı kaynağı ve manuel numaralar saklanır; gönderim kuyruğa alınmaz."}
+                : "Mesaj, alıcı kaynağı, manuel numaralar ve dinamik kuraldan gelen hedef kitle taslakta saklanır; gönderim kuyruğa alınmaz."}
             </p>
             <div className="mt-4 space-y-3">
               <Input
