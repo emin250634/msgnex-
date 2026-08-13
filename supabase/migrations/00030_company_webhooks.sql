@@ -1,13 +1,16 @@
 -- Agency plan webhook configuration.
 -- Delivery worker will be added separately; this phase stores validated endpoints and event subscriptions.
 
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 CREATE TABLE IF NOT EXISTS public.company_webhooks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   endpoint_url TEXT NOT NULL,
   events TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   is_active BOOLEAN NOT NULL DEFAULT true,
-  signing_secret TEXT NOT NULL DEFAULT encode(gen_random_bytes(24), 'hex'),
+  signing_secret TEXT NOT NULL DEFAULT encode(extensions.gen_random_bytes(24), 'hex'),
   last_delivery_status TEXT,
   last_delivery_error TEXT,
   last_delivered_at TIMESTAMPTZ,

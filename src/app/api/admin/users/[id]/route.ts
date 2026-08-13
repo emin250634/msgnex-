@@ -3,9 +3,9 @@ import { requireAdminAuth } from "@/lib/auth/admin"
 import { writeAuditLog } from "@/lib/audit-log"
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
@@ -14,14 +14,15 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile: actorProfile, userId } = auth.context
-    if (params.id === userId) {
+    const { id } = await params
+    if (id === userId) {
       return NextResponse.json({ error: "Kendi admin kullanicinizi silemezsiniz" }, { status: 400 })
     }
 
     const { data: profile, error: profileError } = await adminClient
       .from("profiles")
       .select("id, role")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle()
 
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
@@ -30,16 +31,16 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Admin kullanicilar bu ekrandan silinemez" }, { status: 400 })
     }
 
-    const { error } = await adminClient.auth.admin.deleteUser(params.id, false)
+    const { error } = await adminClient.auth.admin.deleteUser(id, false)
     if (error) {
       const message = error.message.toLowerCase()
       if (!message.includes("not found")) {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
 
-      await adminClient.from("company_users").delete().eq("user_id", params.id)
-      await adminClient.from("company_invitations").delete().eq("user_id", params.id)
-      await adminClient.from("profiles").delete().eq("id", params.id)
+      await adminClient.from("company_users").delete().eq("user_id", id)
+      await adminClient.from("company_invitations").delete().eq("user_id", id)
+      await adminClient.from("profiles").delete().eq("id", id)
     }
 
     await writeAuditLog({
@@ -48,7 +49,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       actorRole: actorProfile.role,
       action: "user.delete",
       targetType: "user",
-      targetId: params.id,
+      targetId: id,
       metadata: {
         deleted_user_role: profile.role,
       },

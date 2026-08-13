@@ -5,10 +5,10 @@ import { writeAuditLog } from "@/lib/audit-log"
 const COMPANY_ROLES = ["company_owner", "company_admin", "company_user"]
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
     membershipId: string
-  }
+  }>
 }
 
 function validationError(message: string) {
@@ -21,6 +21,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile, userId } = auth.context
+    const { id, membershipId } = await params
     const body = await request.json()
     const nextRole = body.role === undefined ? undefined : String(body.role).trim()
     const nextActive = body.is_active === undefined ? undefined : Boolean(body.is_active)
@@ -32,8 +33,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const { data: membership, error: membershipError } = await adminClient
       .from("company_users")
       .select("*")
-      .eq("id", params.membershipId)
-      .eq("company_id", params.id)
+      .eq("id", membershipId)
+      .eq("company_id", id)
       .maybeSingle()
 
     if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
@@ -47,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       const { count } = await adminClient
         .from("company_users")
         .select("*", { count: "exact", head: true })
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .eq("role", "company_owner")
         .eq("is_active", true)
 
@@ -88,7 +89,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       action: "company_user.update",
       targetType: "company_user",
       targetId: membership.id,
-      companyId: params.id,
+      companyId: id,
       metadata: {
         user_id: membership.user_id,
         previous_role: membership.role,
@@ -113,11 +114,12 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile, userId } = auth.context
+    const { id, membershipId } = await params
     const { data: membership, error: membershipError } = await adminClient
       .from("company_users")
       .select("*")
-      .eq("id", params.membershipId)
-      .eq("company_id", params.id)
+      .eq("id", membershipId)
+      .eq("company_id", id)
       .maybeSingle()
 
     if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
@@ -127,7 +129,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       const { count } = await adminClient
         .from("company_users")
         .select("*", { count: "exact", head: true })
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .eq("role", "company_owner")
         .eq("is_active", true)
 
@@ -148,7 +150,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     await adminClient
       .from("company_invitations")
       .delete()
-      .eq("company_id", params.id)
+      .eq("company_id", id)
       .eq("user_id", membership.user_id)
 
     const { count: remainingCount } = await adminClient
@@ -194,7 +196,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       action: "company_user.delete",
       targetType: "company_user",
       targetId: membership.id,
-      companyId: params.id,
+      companyId: id,
       metadata: {
         user_id: membership.user_id,
         role: membership.role,

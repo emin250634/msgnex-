@@ -46,12 +46,6 @@ export default function LoginPage() {
           : error?.message || "Giriş yapılamadı")
       }
 
-      console.log("[login-debug]", {
-        loginSuccessful: true,
-        userId: data.user.id,
-        email: data.user.email,
-      })
-
       const invitationResponse = await fetch("/api/auth/accept-company-invitations", {
         method: "POST",
       })
@@ -70,26 +64,11 @@ export default function LoginPage() {
         throw new Error(`Profil bilgisi okunamadı: ${profileError.message}`)
       }
 
-      console.log("[login-debug]", {
-        userId: data.user.id,
-        email: data.user.email,
-        profileFound: Boolean(profile),
-        profileRole: profile?.role ?? null,
-      })
-
       if (!profile?.is_active) {
         throw new Error("Hesabınız aktif değil. Lütfen sistem yöneticisiyle iletişime geçin.")
       }
 
       if (profile.role === "admin") {
-        console.log("[login-debug]", {
-          userId: data.user.id,
-          email: data.user.email,
-          profileFound: true,
-          profileRole: profile.role,
-          activeMembership: null,
-          targetPath: "/admin/dashboard",
-        })
         toast.success("Giriş başarılı!")
         window.location.assign("/admin/dashboard")
         return
@@ -108,16 +87,6 @@ export default function LoginPage() {
         throw new Error(`Firma üyeliği doğrulanamadı: ${membershipError.message}`)
       }
 
-      const targetPath = membership ? "/dashboard" : null
-      console.log("[login-debug]", {
-        userId: data.user.id,
-        email: data.user.email,
-        profileFound: Boolean(profile),
-        profileRole: profile.role,
-        activeMembership: membership,
-        targetPath,
-      })
-
       if (!membership) {
         throw new Error("Hesabınız aktif bir firmaya bağlı değil veya davet kabul işlemi tamamlanmamış.")
       }
@@ -126,7 +95,6 @@ export default function LoginPage() {
       window.location.assign("/dashboard")
     } catch (error) {
       const message = error instanceof Error ? error.message : "Giriş işlemi tamamlanamadı."
-      console.error("[login-debug]", error)
       setApiError(message)
       toast.error(message)
     } finally {

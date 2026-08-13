@@ -2,18 +2,12 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { MAX_SMS_LENGTH } from "@/lib/sms-segments"
+import { isValidSmsRecipient, normalizeUniqueTrPhones } from "@/lib/phone"
 
 const requestSchema = z.object({
   recipients: z.array(z.string()).min(1).max(1000),
   message: z.string().trim().min(1).max(MAX_SMS_LENGTH),
 })
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "")
-  if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`
-  if (digits.length === 10) return `90${digits}`
-  return digits
-}
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -26,8 +20,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Alıcılar veya mesaj formatı geçersiz" }, { status: 400 })
   }
 
-  const recipients = Array.from(new Set(parsed.data.recipients.map(normalizePhone).filter(Boolean)))
-  if (recipients.length === 0 || recipients.some((recipient) => !/^\d{10,15}$/.test(recipient))) {
+  const recipients = normalizeUniqueTrPhones(parsed.data.recipients)
+  if (recipients.length === 0 || recipients.some((recipient) => !isValidSmsRecipient(recipient))) {
     return NextResponse.json({ error: "Geçerli bir telefon numarası girin" }, { status: 400 })
   }
 

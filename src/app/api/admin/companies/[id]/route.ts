@@ -6,9 +6,9 @@ import { isCompanyPlan } from "@/lib/plans"
 const SALES_STATUSES = ["new", "contacted", "pilot", "won", "lost"]
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function deleteUserIfOrphan(adminClient: any, userId: string, deletedCompanyId: string) {
@@ -65,6 +65,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile, userId } = auth.context
+    const { id } = await params
     const body = await request.json().catch(() => ({}))
     const updates: Record<string, string | null> = {}
     const metadata: Record<string, unknown> = {}
@@ -107,7 +108,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const { data: currentCompany, error: currentError } = await adminClient
       .from("companies")
       .select("id, plan, sales_status, pilot_started_at, expected_monthly_sms_volume, sales_note")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle()
 
     if (currentError) return NextResponse.json({ error: currentError.message }, { status: 500 })
@@ -116,7 +117,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const { data: company, error: updateError } = await adminClient
       .from("companies")
       .update(updates)
-      .eq("id", params.id)
+      .eq("id", id)
       .select("*")
       .maybeSingle()
 
@@ -137,8 +138,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       actorRole: profile.role,
       action: "company.update",
       targetType: "company",
-      targetId: params.id,
-      companyId: params.id,
+      targetId: id,
+      companyId: id,
       metadata,
     })
 
@@ -157,10 +158,11 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile, userId } = auth.context
+    const { id } = await params
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle()
 
     if (companyError) return NextResponse.json({ error: companyError.message }, { status: 500 })
@@ -173,11 +175,11 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       adminClient
         .from("company_users")
         .select("user_id")
-        .eq("company_id", params.id),
+        .eq("company_id", id),
       adminClient
         .from("profiles")
         .select("id")
-        .eq("company_id", params.id),
+        .eq("company_id", id),
     ])
 
     if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
@@ -191,12 +193,12 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     const { error: deleteError } = await adminClient
       .from("companies")
       .delete()
-      .eq("id", params.id)
+      .eq("id", id)
 
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
     for (const userId of userIds) {
-      await deleteUserIfOrphan(adminClient, userId, params.id)
+      await deleteUserIfOrphan(adminClient, userId, id)
     }
 
     await writeAuditLog({
@@ -205,8 +207,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       actorRole: profile.role,
       action: "company.delete",
       targetType: "company",
-      targetId: params.id,
-      companyId: params.id,
+      targetId: id,
+      companyId: id,
       metadata: {
         affected_user_count: userIds.length,
       },

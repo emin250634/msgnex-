@@ -1,2 +1,0 @@
--- Legacy compatibility migration.
--- Profile RLS is finalized by 00006_secure_dispatch.sql.

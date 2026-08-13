@@ -8,9 +8,9 @@ import type { SmsProvider } from "@/services/sms-provider"
 const PROVIDER_NAME = "netgsm"
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 interface ProviderSettingsRow {
@@ -170,10 +170,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient } = auth.context
+    const { id } = await params
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle()
 
     if (companyError) {
@@ -183,7 +184,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 })
     }
 
-    return stateResponse(await readProviderState(adminClient, params.id))
+    return stateResponse(await readProviderState(adminClient, id))
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unexpected server error" },
@@ -198,10 +199,11 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile, userId } = auth.context
+    const { id } = await params
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle()
 
     if (companyError) {
@@ -217,7 +219,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return validationError("Provider aksiyonu geçersiz")
     }
 
-    const state = await readProviderState(adminClient, params.id)
+    const state = await readProviderState(adminClient, id)
     const provider = createProviderFromSettings(state.settings)
 
     if (action === "test_connection") {
@@ -241,7 +243,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         action: "provider.test_connection",
         targetType: "company_provider_settings",
         targetId: state.settings?.id ?? null,
-        companyId: params.id,
+        companyId: id,
         metadata: {
           provider_name: PROVIDER_NAME,
           ok: result.ok,
@@ -249,7 +251,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         },
       })
 
-      return stateResponse(await readProviderState(adminClient, params.id), {
+      return stateResponse(await readProviderState(adminClient, id), {
         action,
         result,
       })
@@ -268,7 +270,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       if (result.ok) {
         const now = new Date().toISOString()
         const rows = Array.from(new Set(normalizedHeaders)).map((header) => ({
-          company_id: params.id,
+          company_id: id,
           provider_name: PROVIDER_NAME,
           header,
           status: "approved",
@@ -303,7 +305,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         action: "provider.query_headers",
         targetType: "company_provider_settings",
         targetId: state.settings?.id ?? null,
-        companyId: params.id,
+        companyId: id,
         metadata: {
           provider_name: PROVIDER_NAME,
           ok: result.ok,
@@ -312,7 +314,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         },
       })
 
-      return stateResponse(await readProviderState(adminClient, params.id), {
+      return stateResponse(await readProviderState(adminClient, id), {
         action,
         result,
       })
@@ -323,7 +325,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const now = new Date().toISOString()
     const walletPayload = {
-      company_id: params.id,
+      company_id: id,
       provider_name: PROVIDER_NAME,
       balance: result.amount ?? 0,
       balance_unit: result.unit,
@@ -355,7 +357,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       action: "provider.query_credit",
       targetType: "company_provider_settings",
       targetId: state.settings?.id ?? null,
-      companyId: params.id,
+      companyId: id,
       metadata: {
         provider_name: PROVIDER_NAME,
         ok: result.ok,
@@ -365,7 +367,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       },
     })
 
-    return stateResponse(await readProviderState(adminClient, params.id), {
+    return stateResponse(await readProviderState(adminClient, id), {
       action,
       result,
     })
@@ -383,10 +385,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     if (!auth.ok) return auth.response
 
     const { adminClient, profile, userId } = auth.context
+    const { id } = await params
     const { data: company, error: companyError } = await adminClient
       .from("companies")
       .select("id")
-      .eq("id", params.id)
+      .eq("id", id)
       .maybeSingle()
 
     if (companyError) {
@@ -416,7 +419,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const { data: existing, error: existingError } = await adminClient
       .from("company_provider_settings")
       .select("id, encrypted_secret")
-      .eq("company_id", params.id)
+      .eq("company_id", id)
       .eq("provider_name", PROVIDER_NAME)
       .maybeSingle()
 
@@ -436,7 +439,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       const { data: allowedHeader, error: allowedHeaderError } = await adminClient
         .from("company_provider_sender_headers")
         .select("header")
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .eq("provider_name", PROVIDER_NAME)
         .eq("header", senderHeader)
         .eq("status", "approved")
@@ -484,7 +487,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       const { error: insertError } = await adminClient
         .from("company_provider_settings")
         .insert({
-          company_id: params.id,
+          company_id: id,
           provider_name: PROVIDER_NAME,
           usercode: effectiveUsercode,
           encrypted_secret: encryptedSecret,
@@ -508,13 +511,13 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       adminClient
         .from("company_provider_settings")
         .select("id, provider_name, is_active, usercode, encrypted_secret, secret_last_changed_at, sender_header, sender_header_status, connection_status, timeout_ms, encoding, created_at, updated_at")
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .eq("provider_name", PROVIDER_NAME)
         .maybeSingle(),
       adminClient
         .from("company_provider_wallets")
         .select("balance, balance_unit, currency, last_synced_at, sync_status, last_sync_error")
-        .eq("company_id", params.id)
+        .eq("company_id", id)
         .eq("provider_name", PROVIDER_NAME)
         .maybeSingle(),
     ])
@@ -526,7 +529,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       action: existing?.id ? "provider.update" : "provider.create",
       targetType: "company_provider_settings",
       targetId: (settings as ProviderSettingsRow | null)?.id ?? existing?.id ?? null,
-      companyId: params.id,
+      companyId: id,
       metadata: {
         provider_name: PROVIDER_NAME,
         is_active: isActive,
