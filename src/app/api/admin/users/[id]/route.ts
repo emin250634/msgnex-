@@ -25,7 +25,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       .eq("id", id)
       .maybeSingle()
 
-    if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
+    if (profileError) {
+      console.error("[admin-users:delete:read-profile]", { targetUserId: id, actorUserId: userId, error: profileError })
+      return NextResponse.json({ error: "Kullanıcı bilgisi okunamadı." }, { status: 500 })
+    }
     if (!profile) return NextResponse.json({ error: "Kullanici bulunamadi" }, { status: 404 })
     if (profile.role === "admin") {
       return NextResponse.json({ error: "Admin kullanicilar bu ekrandan silinemez" }, { status: 400 })
@@ -33,9 +36,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
     const { error } = await adminClient.auth.admin.deleteUser(id, false)
     if (error) {
-      const message = error.message.toLowerCase()
-      if (!message.includes("not found")) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+      if ((error as { status?: number }).status !== 404) {
+        console.error("[admin-users:delete:auth-user]", { targetUserId: id, actorUserId: userId, error })
+        return NextResponse.json({ error: "Kullanıcı silinemedi." }, { status: 500 })
       }
 
       await adminClient.from("company_users").delete().eq("user_id", id)
@@ -57,8 +60,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
+    console.error("[admin-users:delete:unexpected]", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Kullanıcı silinemedi." },
       { status: 500 }
     )
   }

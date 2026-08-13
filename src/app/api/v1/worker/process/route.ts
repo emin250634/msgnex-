@@ -29,8 +29,9 @@ export async function POST(request: Request) {
   try {
     supabase = createAdminClient()
   } catch (error) {
+    console.error("[worker-process:init]", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Worker ayarlari eksik" },
+      { error: "Worker ayarlari eksik" },
       { status: 500 }
     )
   }
@@ -40,17 +41,26 @@ export async function POST(request: Request) {
     "flag_stale_sending_campaigns",
     { p_timeout_minutes: parsed.data.staleTimeoutMinutes }
   )
-  if (staleError) return NextResponse.json({ error: staleError.message }, { status: 500 })
+  if (staleError) {
+    console.error("[worker-process:flag-stale-campaigns]", { error: staleError })
+    return NextResponse.json({ error: "Worker islemi tamamlanamadi" }, { status: 500 })
+  }
 
   const { data: flaggedApiDispatchCount, error: staleApiError } = await supabase.rpc(
     "flag_stale_api_sms_dispatches",
     { p_timeout_minutes: parsed.data.staleTimeoutMinutes }
   )
-  if (staleApiError) return NextResponse.json({ error: staleApiError.message }, { status: 500 })
+  if (staleApiError) {
+    console.error("[worker-process:flag-stale-api-dispatches]", { error: staleApiError })
+    return NextResponse.json({ error: "Worker islemi tamamlanamadi" }, { status: 500 })
+  }
 
   for (let index = 0; index < parsed.data.maxCampaigns; index += 1) {
     const { data: campaign, error: claimError } = await supabase.rpc("claim_queued_sms_campaign")
-    if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 })
+    if (claimError) {
+      console.error("[worker-process:claim-campaign]", { error: claimError })
+      return NextResponse.json({ error: "Worker islemi tamamlanamadi" }, { status: 500 })
+    }
     if (!campaign) break
 
     const results = await sendCampaignWithCompanyProvider(supabase, {
@@ -66,7 +76,10 @@ export async function POST(request: Request) {
       { p_campaign_id: campaign.campaign_id, p_results: results }
     )
 
-    if (completionError) return NextResponse.json({ error: completionError.message }, { status: 500 })
+    if (completionError) {
+      console.error("[worker-process:complete-campaign]", { campaignId: campaign.campaign_id, error: completionError })
+      return NextResponse.json({ error: "Worker islemi tamamlanamadi" }, { status: 500 })
+    }
     processed.push(completed)
   }
 

@@ -34,7 +34,10 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle()
 
-  if (membershipError) return errorResponse(membershipError.message, 500)
+  if (membershipError) {
+    console.error("[plan-upgrade-requests:read-membership]", { userId: user.id, error: membershipError })
+    return errorResponse("Firma üyeliği kontrol edilemedi.", 500)
+  }
 
   let companyId = membership?.company_id as string | undefined
   if (!companyId) {
@@ -44,7 +47,10 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .maybeSingle()
 
-    if (profileError) return errorResponse(profileError.message, 500)
+    if (profileError) {
+      console.error("[plan-upgrade-requests:read-profile]", { userId: user.id, error: profileError })
+      return errorResponse("Firma üyeliği kontrol edilemedi.", 500)
+    }
     companyId = profile?.company_id as string | undefined
   }
 
@@ -62,7 +68,10 @@ export async function POST(request: Request) {
     .select("id, status, created_at")
     .single()
 
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[plan-upgrade-requests:create]", { userId: user.id, companyId, requestedPlan, error })
+    return errorResponse("Plan talebi oluşturulamadı.", 500)
+  }
 
   return NextResponse.json({
     ok: true,

@@ -176,8 +176,9 @@ export async function POST(request: Request) {
   try {
     supabase = createAdminClient()
   } catch (error) {
+    console.error("[worker-webhooks:init]", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Worker ayarları eksik" },
+      { error: "Worker ayarları eksik" },
       { status: 500 }
     )
   }
@@ -186,7 +187,10 @@ export async function POST(request: Request) {
     p_limit: parsed.data.maxDeliveries,
   })
 
-  if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 })
+  if (claimError) {
+    console.error("[worker-webhooks:claim-deliveries]", { error: claimError })
+    return NextResponse.json({ error: "Webhook teslimatları alınamadı." }, { status: 500 })
+  }
 
   const processed = []
   for (const delivery of (deliveries ?? []) as ClaimedWebhookDelivery[]) {
@@ -200,11 +204,12 @@ export async function POST(request: Request) {
     })
 
     if (completeError) {
+      console.error("[worker-webhooks:complete-delivery]", { deliveryId: delivery.id, webhookId: delivery.webhook_id, error: completeError })
       processed.push({
         id: delivery.id,
         event: delivery.event_type,
         ok: false,
-        error: completeError.message,
+        error: "Webhook teslimatı tamamlanamadı.",
       })
       continue
     }

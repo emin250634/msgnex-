@@ -34,12 +34,12 @@ async function deleteUserIfOrphan(adminClient: any, userId: string, deletedCompa
   if ((count ?? 0) === 0) {
     const { error } = await adminClient.auth.admin.deleteUser(userId, false)
     if (error) {
-      const message = error.message.toLowerCase()
-      if (message.includes("not found")) {
+      if ((error as { status?: number }).status === 404) {
         await adminClient.from("profiles").delete().eq("id", userId)
         return
       }
-      throw new Error(`Kullanici silinemedi (${userId}): ${error.message}`)
+      console.error("[admin-company:delete-orphan-user]", { userId, deletedCompanyId, error })
+      throw new Error("Kullanıcı silinemedi.")
     }
     return
   }
@@ -111,7 +111,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       .eq("id", id)
       .maybeSingle()
 
-    if (currentError) return NextResponse.json({ error: currentError.message }, { status: 500 })
+    if (currentError) {
+      console.error("[admin-company:update:read-current]", { companyId: id, userId, error: currentError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
+    }
     if (!currentCompany) return NextResponse.json({ error: "Firma bulunamadi" }, { status: 404 })
 
     const { data: company, error: updateError } = await adminClient
@@ -121,7 +124,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       .select("*")
       .maybeSingle()
 
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    if (updateError) {
+      console.error("[admin-company:update]", { companyId: id, userId, error: updateError })
+      return NextResponse.json({ error: "Firma güncellenemedi." }, { status: 500 })
+    }
     if (!company) return NextResponse.json({ error: "Firma bulunamadi" }, { status: 404 })
 
     const currentValues = currentCompany as Record<string, unknown>
@@ -145,8 +151,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ company, message: "Firma güncellendi" })
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-company:update:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma güncellenemedi." },
       { status: 500 }
     )
   }
@@ -165,7 +173,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       .eq("id", id)
       .maybeSingle()
 
-    if (companyError) return NextResponse.json({ error: companyError.message }, { status: 500 })
+    if (companyError) {
+      console.error("[admin-company:delete:read-company]", { companyId: id, userId, error: companyError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
+    }
     if (!company) return NextResponse.json({ error: "Firma bulunamadi" }, { status: 404 })
 
     const [
@@ -182,8 +193,14 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
         .eq("company_id", id),
     ])
 
-    if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
-    if (legacyProfilesError) return NextResponse.json({ error: legacyProfilesError.message }, { status: 500 })
+    if (membershipError) {
+      console.error("[admin-company:delete:read-memberships]", { companyId: id, userId, error: membershipError })
+      return NextResponse.json({ error: "Firma kullanıcıları okunamadı." }, { status: 500 })
+    }
+    if (legacyProfilesError) {
+      console.error("[admin-company:delete:read-legacy-profiles]", { companyId: id, userId, error: legacyProfilesError })
+      return NextResponse.json({ error: "Firma kullanıcıları okunamadı." }, { status: 500 })
+    }
 
     const userIds = Array.from(new Set([
       ...(memberships ?? []).map((row: any) => row.user_id).filter(Boolean),
@@ -195,7 +212,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       .delete()
       .eq("id", id)
 
-    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
+    if (deleteError) {
+      console.error("[admin-company:delete]", { companyId: id, userId, error: deleteError })
+      return NextResponse.json({ error: "Firma silinemedi." }, { status: 500 })
+    }
 
     for (const userId of userIds) {
       await deleteUserIfOrphan(adminClient, userId, id)
@@ -216,8 +236,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-company:delete:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma silinemedi." },
       { status: 500 }
     )
   }

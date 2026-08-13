@@ -37,7 +37,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       .eq("company_id", id)
       .maybeSingle()
 
-    if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
+    if (membershipError) {
+      console.error("[admin-company-user:update:read-membership]", { companyId: id, membershipId, userId, error: membershipError })
+      return NextResponse.json({ error: "Firma kullanıcısı okunamadı." }, { status: 500 })
+    }
     if (!membership) return NextResponse.json({ error: "Company user not found" }, { status: 404 })
 
     const ownerWillBeChanged =
@@ -70,7 +73,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       .update(updatePayload)
       .eq("id", membership.id)
 
-    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+    if (updateError) {
+      console.error("[admin-company-user:update]", { companyId: id, membershipId, userId, error: updateError })
+      return NextResponse.json({ error: "Firma kullanıcısı güncellenemedi." }, { status: 500 })
+    }
 
     if (nextRole !== undefined || nextActive !== undefined) {
       await adminClient
@@ -101,8 +107,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
+    const { id, membershipId } = await params
+    console.error("[admin-company-user:update:unexpected]", { companyId: id, membershipId, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma kullanıcısı güncellenemedi." },
       { status: 500 }
     )
   }
@@ -122,7 +130,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       .eq("company_id", id)
       .maybeSingle()
 
-    if (membershipError) return NextResponse.json({ error: membershipError.message }, { status: 500 })
+    if (membershipError) {
+      console.error("[admin-company-user:delete:read-membership]", { companyId: id, membershipId, userId, error: membershipError })
+      return NextResponse.json({ error: "Firma kullanıcısı okunamadı." }, { status: 500 })
+    }
     if (!membership) return NextResponse.json({ error: "Company user not found" }, { status: 404 })
 
     if (membership.role === "company_owner") {
@@ -144,7 +155,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
       .eq("id", membership.id)
 
     if (deleteMembershipError) {
-      return NextResponse.json({ error: deleteMembershipError.message }, { status: 500 })
+      console.error("[admin-company-user:delete-membership]", { companyId: id, membershipId, userId, error: deleteMembershipError })
+      return NextResponse.json({ error: "Firma kullanıcısı silinemedi." }, { status: 500 })
     }
 
     await adminClient
@@ -167,7 +179,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
       if (profile?.role !== "admin") {
         const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(membership.user_id, false)
-        if (deleteUserError) return NextResponse.json({ error: deleteUserError.message }, { status: 500 })
+        if (deleteUserError) {
+          console.error("[admin-company-user:delete-auth-user]", { companyId: id, membershipId, targetUserId: membership.user_id, userId, error: deleteUserError })
+          return NextResponse.json({ error: "Firma kullanıcısı silinemedi." }, { status: 500 })
+        }
       }
     } else {
       const { data: nextMemberships } = await adminClient
@@ -206,8 +221,10 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
+    const { id, membershipId } = await params
+    console.error("[admin-company-user:delete:unexpected]", { companyId: id, membershipId, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma kullanıcısı silinemedi." },
       { status: 500 }
     )
   }

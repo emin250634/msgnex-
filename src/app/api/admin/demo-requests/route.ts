@@ -11,6 +11,8 @@ const PROVIDER_STATUS_LABELS: Record<string, string> = {
   planning: "Teklif aşamasında",
 }
 
+class DemoRequestSafeError extends Error {}
+
 function errorResponse(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
 }
@@ -55,7 +57,10 @@ async function updateSalesFollowUp(auth: Awaited<ReturnType<typeof requireAdminA
     last_error: null,
   }).eq("id", id).select("*").maybeSingle()
 
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[admin-demo-requests:update-sales-follow-up]", { requestId: id, error })
+    return errorResponse("Satış takip notu kaydedilemedi.", 500)
+  }
   if (!data) return errorResponse("Demo talebi bulunamadı.", 404)
   return NextResponse.json({ request: data, message: "Satış takip notu kaydedildi." })
 }
@@ -64,7 +69,10 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
   if (!auth.ok) return auth.response
   const { adminClient, userId } = auth.context
   const { data: demo, error: demoError } = await adminClient.from("demo_requests").select("*").eq("id", id).maybeSingle()
-  if (demoError) return errorResponse(demoError.message, 500)
+  if (demoError) {
+    console.error("[admin-demo-requests:approve:read-demo]", { requestId: id, error: demoError })
+    return errorResponse("Demo talebi okunamadı.", 500)
+  }
   if (!demo) return errorResponse("Demo talebi bulunamadı.", 404)
   if (demo.status === "rejected") return errorResponse("Reddedilmiş demo talebi doğrudan onaylanamaz.")
   if (demo.status === "approved" && demo.company_id && demo.invitation_id) {
@@ -80,8 +88,8 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
         adminClient.from("companies").select("id, name").ilike("name", String(demo.company_name).trim()).limit(1).maybeSingle(),
         adminClient.from("profiles").select("id, email").ilike("email", email).limit(1).maybeSingle(),
       ])
-      if (sameCompany) throw new Error(`"${sameCompany.name}" adına kayıtlı bir firma zaten mevcut.`)
-      if (sameProfile) throw new Error("Bu e-posta adresine ait bir kullanıcı hesabı zaten mevcut.")
+      if (sameCompany) throw new DemoRequestSafeError(`"${sameCompany.name}" adına kayıtlı bir firma zaten mevcut.`)
+      if (sameProfile) throw new DemoRequestSafeError("Bu e-posta adresine ait bir kullanıcı hesabı zaten mevcut.")
 
       const { data: company, error: companyError } = await adminClient.from("companies").insert({
         name: String(demo.company_name).trim(),
@@ -167,7 +175,9 @@ async function approveDemoRequest(request: NextRequest, auth: Awaited<ReturnType
       message: "Firma oluşturuldu ve davet maili gönderildi.",
     })
   } catch (error) {
-    const message = await recordError(adminClient, id, error, companyId ? { company_id: companyId } : {})
+    await recordError(adminClient, id, error, companyId ? { company_id: companyId } : {})
+    console.error("[admin-demo-requests:approve]", { requestId: id, companyId, error })
+    const message = error instanceof DemoRequestSafeError ? error.message : "Demo talebi onaylanamadı."
     return errorResponse(message, 409)
   }
 }
@@ -176,7 +186,10 @@ async function rejectDemoRequest(auth: Awaited<ReturnType<typeof requireAdminAut
   if (!auth.ok) return auth.response
   const { adminClient } = auth.context
   const { data: demo, error } = await adminClient.from("demo_requests").select("*").eq("id", id).maybeSingle()
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[admin-demo-requests:reject:read-demo]", { requestId: id, error })
+    return errorResponse("Demo talebi okunamadı.", 500)
+  }
   if (!demo) return errorResponse("Demo talebi bulunamadı.", 404)
   if (demo.status === "approved" || demo.company_id) return errorResponse("Firma oluşturulmuş bir demo talebi reddedilemez.")
 
@@ -204,8 +217,9 @@ async function rejectDemoRequest(auth: Awaited<ReturnType<typeof requireAdminAut
     if (updateError) throw new Error(updateError.message)
     return NextResponse.json({ request: updated, message: "Demo talebi reddedildi ve bilgilendirme maili gönderildi." })
   } catch (mailError) {
-    const message = await recordError(adminClient, id, mailError)
-    return errorResponse(message, 500)
+    await recordError(adminClient, id, mailError)
+    console.error("[admin-demo-requests:reject]", { requestId: id, error: mailError })
+    return errorResponse("Demo talebi reddedilemedi.", 500)
   }
 }
 
@@ -213,7 +227,10 @@ export async function GET() {
   const auth = await requireAdminAuth()
   if (!auth.ok) return auth.response
   const { data, error } = await auth.context.adminClient.from("demo_requests").select("*").order("created_at", { ascending: false }).limit(250)
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[admin-demo-requests:list]", { error })
+    return errorResponse("Demo talepleri listelenemedi.", 500)
+  }
   return NextResponse.json({ requests: data ?? [] })
 }
 
@@ -235,7 +252,10 @@ export async function PATCH(request: NextRequest) {
 
   const { data, error } = await auth.context.adminClient.from("demo_requests")
     .update({ status, last_error: null }).eq("id", id).select("*").maybeSingle()
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[admin-demo-requests:update-status]", { requestId: id, status, error })
+    return errorResponse("Demo talebi güncellenemedi.", 500)
+  }
   if (!data) return errorResponse("Demo talebi bulunamadı.", 404)
   return NextResponse.json({ request: data, message: "Demo talebi güncellendi." })
 }

@@ -22,7 +22,10 @@ export async function GET() {
     .order("created_at", { ascending: false })
     .limit(250)
 
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[admin-plan-upgrade-requests:list]", { error })
+    return errorResponse("Plan talepleri listelenemedi.", 500)
+  }
 
   const companyIds = Array.from(new Set((requests ?? []).map((item) => item.company_id).filter(Boolean)))
   const companyMap = new Map<string, string>()
@@ -33,7 +36,10 @@ export async function GET() {
       .select("id, name")
       .in("id", companyIds)
 
-    if (companiesError) return errorResponse(companiesError.message, 500)
+    if (companiesError) {
+      console.error("[admin-plan-upgrade-requests:list-companies]", { companyIds, error: companiesError })
+      return errorResponse("Firma bilgileri okunamadı.", 500)
+    }
     companies?.forEach((company) => companyMap.set(company.id, company.name))
   }
 
@@ -70,7 +76,10 @@ export async function PATCH(request: NextRequest) {
     .select("*")
     .maybeSingle()
 
-  if (error) return errorResponse(error.message, 500)
+  if (error) {
+    console.error("[admin-plan-upgrade-requests:update]", { requestId: id, status, error })
+    return errorResponse("Plan talebi güncellenemedi.", 500)
+  }
   if (!data) return errorResponse("Plan talebi bulunamadı.", 404)
 
   return NextResponse.json({ request: data, message: "Plan talebi güncellendi." })

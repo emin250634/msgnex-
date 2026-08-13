@@ -31,7 +31,8 @@ export async function POST(request: Request) {
   })
 
   if (error || !campaign) {
-    return NextResponse.json({ error: error?.message || "Kampanya kuyruğa alınamadı" }, { status: 400 })
+    console.error("[messages:queue-campaign]", { userId: user.id, error })
+    return NextResponse.json({ error: "Kampanya kuyruğa alınamadı" }, { status: 400 })
   }
 
   return NextResponse.json({

@@ -115,9 +115,9 @@ export async function POST(request: NextRequest) {
       accepted_count: invitations?.length ?? 0,
     })
   } catch (error) {
-    console.error("[accept-company-invitations]", error)
+    console.error("[accept-company-invitations]", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Davet kabul işlemi tamamlanamadı" },
+      { error: "Davet kabul işlemi tamamlanamadı." },
       { status: 500 }
     )
   }

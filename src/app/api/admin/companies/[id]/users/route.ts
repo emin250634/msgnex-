@@ -31,7 +31,10 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     const { adminClient } = auth.context
     const { id } = await params
     const { data: company, error: companyError } = await ensureCompany(adminClient, id)
-    if (companyError) return NextResponse.json({ error: companyError.message }, { status: 500 })
+    if (companyError) {
+      console.error("[admin-company-users:list:read-company]", { companyId: id, error: companyError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
+    }
     if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 })
 
     const [{ data: memberships }, { data: invitations }] = await Promise.all([
@@ -74,8 +77,10 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ users })
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-company-users:list:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma kullanıcıları listelenemedi." },
       { status: 500 }
     )
   }
@@ -89,7 +94,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const { adminClient, userId } = auth.context
     const { id } = await params
     const { data: company, error: companyError } = await ensureCompany(adminClient, id)
-    if (companyError) return NextResponse.json({ error: companyError.message }, { status: 500 })
+    if (companyError) {
+      console.error("[admin-company-users:invite:read-company]", { companyId: id, userId, error: companyError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
+    }
     if (!company) return NextResponse.json({ error: "Company not found" }, { status: 404 })
 
     const body = await request.json()
@@ -109,7 +117,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       .eq("company_id", id)
       .eq("is_active", true)
 
-    if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
+    if (countError) {
+      console.error("[admin-company-users:invite:count-users]", { companyId: id, userId, error: countError })
+      return NextResponse.json({ error: "Firma kullanıcı limiti kontrol edilemedi." }, { status: 500 })
+    }
     if ((currentUsers ?? 0) >= userLimit) {
       return validationError(`Bu plan en fazla ${userLimit} aktif kullanıcı destekler.`)
     }
@@ -133,7 +144,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         invited_by: userId,
         last_error: invite.error?.message || "Davet gönderilemedi",
       }, { onConflict: "company_id,email" })
-      return NextResponse.json({ error: invite.error?.message || "Davet gönderilemedi" }, { status: 500 })
+      console.error("[admin-company-users:invite:send]", { companyId: id, userId, email, error: invite.error })
+      return NextResponse.json({ error: "Davet gönderilemedi." }, { status: 500 })
     }
 
     const invitedUser = invite.data.user
@@ -168,8 +180,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ user_id: invitedUser.id })
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-company-users:invite:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma kullanıcısı davet edilemedi." },
       { status: 500 }
     )
   }

@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (companyError || !company) {
-      return NextResponse.json({ error: companyError?.message || "Firma oluşturulamadı" }, { status: 500 })
+      console.error("[admin-companies:create-company]", { userId, error: companyError })
+      return NextResponse.json({ error: "Firma oluşturulamadı." }, { status: 500 })
     }
 
     const invite = await adminClient.auth.admin.inviteUserByEmail(ownerEmail, {
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
 
     if (invite.error || !invite.data.user) {
       await adminClient.from("companies").delete().eq("id", company.id)
-      return NextResponse.json({ error: invite.error?.message || "Davet gönderilemedi" }, { status: 500 })
+      console.error("[admin-companies:invite-owner]", { userId, companyId: company.id, ownerEmail, error: invite.error })
+      return NextResponse.json({ error: "Davet gönderilemedi." }, { status: 500 })
     }
 
     const invitedUser = invite.data.user
@@ -95,8 +97,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ company_id: company.id })
   } catch (error) {
+    console.error("[admin-companies:create]", { error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Firma oluşturma işlemi tamamlanamadı." },
       { status: 500 }
     )
   }

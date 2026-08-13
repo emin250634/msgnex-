@@ -178,7 +178,8 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       .maybeSingle()
 
     if (companyError) {
-      return NextResponse.json({ error: companyError.message }, { status: 500 })
+      console.error("[admin-provider-settings:get:read-company]", { companyId: id, error: companyError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 })
@@ -186,8 +187,10 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
     return stateResponse(await readProviderState(adminClient, id))
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-provider-settings:get:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Provider ayarları okunamadı." },
       { status: 500 }
     )
   }
@@ -207,7 +210,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       .maybeSingle()
 
     if (companyError) {
-      return NextResponse.json({ error: companyError.message }, { status: 500 })
+      console.error("[admin-provider-settings:action:read-company]", { companyId: id, userId, error: companyError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 })
@@ -234,7 +238,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         })
         .eq("id", state.settings?.id)
 
-      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+      if (updateError) {
+        console.error("[admin-provider-settings:test-connection:update-status]", { companyId: id, userId, settingsId: state.settings?.id, error: updateError })
+        return NextResponse.json({ error: "Provider bağlantı durumu güncellenemedi." }, { status: 500 })
+      }
 
       await writeAuditLog({
         adminClient,
@@ -283,7 +290,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             .from("company_provider_sender_headers")
             .upsert(rows, { onConflict: "company_id,provider_name,header" })
 
-          if (headersError) return NextResponse.json({ error: headersError.message }, { status: 500 })
+          if (headersError) {
+            console.error("[admin-provider-settings:query-headers:upsert]", { companyId: id, userId, error: headersError })
+            return NextResponse.json({ error: "Provider başlıkları kaydedilemedi." }, { status: 500 })
+          }
         }
       }
 
@@ -296,7 +306,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         })
         .eq("id", state.settings?.id)
 
-      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
+      if (updateError) {
+        console.error("[admin-provider-settings:query-headers:update-status]", { companyId: id, userId, settingsId: state.settings?.id, error: updateError })
+        return NextResponse.json({ error: "Provider başlık durumu güncellenemedi." }, { status: 500 })
+      }
 
       await writeAuditLog({
         adminClient,
@@ -340,7 +353,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       .from("company_provider_wallets")
       .upsert(walletPayload, { onConflict: "company_id,provider_name" })
 
-    if (walletError) return NextResponse.json({ error: walletError.message }, { status: 500 })
+    if (walletError) {
+      console.error("[admin-provider-settings:query-credit:upsert-wallet]", { companyId: id, userId, error: walletError })
+      return NextResponse.json({ error: "Provider bakiye bilgisi kaydedilemedi." }, { status: 500 })
+    }
 
     await adminClient
       .from("company_provider_settings")
@@ -372,8 +388,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       result,
     })
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-provider-settings:action:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Provider işlemi tamamlanamadı." },
       { status: 500 }
     )
   }
@@ -393,7 +411,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       .maybeSingle()
 
     if (companyError) {
-      return NextResponse.json({ error: companyError.message }, { status: 500 })
+      console.error("[admin-provider-settings:save:read-company]", { companyId: id, userId, error: companyError })
+      return NextResponse.json({ error: "Firma bilgisi okunamadı." }, { status: 500 })
     }
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 })
@@ -424,7 +443,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       .maybeSingle()
 
     if (existingError) {
-      return NextResponse.json({ error: existingError.message }, { status: 500 })
+      console.error("[admin-provider-settings:save:read-existing]", { companyId: id, userId, error: existingError })
+      return NextResponse.json({ error: "Mevcut provider ayarları okunamadı." }, { status: 500 })
     }
 
     const hasExistingSecret = Boolean(existing?.encrypted_secret)
@@ -446,7 +466,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         .maybeSingle()
 
       if (allowedHeaderError) {
-        return NextResponse.json({ error: allowedHeaderError.message }, { status: 500 })
+        console.error("[admin-provider-settings:save:check-sender-header]", { companyId: id, userId, senderHeader, error: allowedHeaderError })
+        return NextResponse.json({ error: "Gönderici başlığı doğrulanamadı." }, { status: 500 })
       }
       if (!allowedHeader) {
         return validationError("Başlık manuel girilemez. Önce sağlayıcıdan başlıkları sorgulayın ve listeden seçim yapın.")
@@ -481,7 +502,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         .eq("id", existing.id)
 
       if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 })
+        console.error("[admin-provider-settings:save:update]", { companyId: id, userId, settingsId: existing.id, error: updateError })
+        return NextResponse.json({ error: "Provider ayarları güncellenemedi." }, { status: 500 })
       }
     } else {
       const { error: insertError } = await adminClient
@@ -503,7 +525,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         })
 
       if (insertError) {
-        return NextResponse.json({ error: insertError.message }, { status: 500 })
+        console.error("[admin-provider-settings:save:insert]", { companyId: id, userId, error: insertError })
+        return NextResponse.json({ error: "Provider ayarları kaydedilemedi." }, { status: 500 })
       }
     }
 
@@ -548,8 +571,10 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       wallet: safeWallet(wallet as ProviderWalletRow | null),
     })
   } catch (error) {
+    const { id } = await params
+    console.error("[admin-provider-settings:save:unexpected]", { companyId: id, error })
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unexpected server error" },
+      { error: "Provider ayarları kaydedilemedi." },
       { status: 500 }
     )
   }
