@@ -1,14 +1,43 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { checkRateLimit, clientIpFromHeaders } from "@/lib/server-rate-limit"
 
-export async function POST() {
+const INVITATION_IP_LIMIT = 30
+const INVITATION_USER_LIMIT = 10
+const INVITATION_WINDOW_MS = 5 * 60 * 1000
+
+function rateLimitedResponse(retryAfterSeconds: number) {
+  return NextResponse.json(
+    { error: "Çok fazla davet kabul denemesi yapıldı. Lütfen daha sonra tekrar deneyin." },
+    { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } }
+  )
+}
+
+export async function POST(request: NextRequest) {
   try {
+    const ipLimit = checkRateLimit({
+      key: `accept-invitation:ip:${clientIpFromHeaders(request.headers)}`,
+      limit: INVITATION_IP_LIMIT,
+      windowMs: INVITATION_WINDOW_MS,
+    })
+    if (!ipLimit.allowed) {
+      return rateLimitedResponse(ipLimit.retryAfterSeconds)
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user?.email) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+    const userLimit = checkRateLimit({
+      key: `accept-invitation:user:${user.id}`,
+      limit: INVITATION_USER_LIMIT,
+      windowMs: INVITATION_WINDOW_MS,
+    })
+    if (!userLimit.allowed) {
+      return rateLimitedResponse(userLimit.retryAfterSeconds)
     }
 
     const adminClient = createAdminClient()
