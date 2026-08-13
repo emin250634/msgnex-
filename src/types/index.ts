@@ -219,6 +219,57 @@ export interface SmsTemplate {
   updated_at: string
 }
 
+export interface AutomationRule {
+  id: string
+  company_id: string
+  name: string
+  type: "birthday"
+  status: "active" | "inactive"
+  target_group_id: string | null
+  template_id: string | null
+  message: string
+  send_time: string
+  timezone: string
+  day_offset: 0 | 1 | 7
+  requires_approval: boolean
+  last_run_on: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AutomationRun {
+  id: string
+  company_id: string
+  automation_rule_id: string
+  run_date: string
+  status: "running" | "completed" | "failed" | "review_required"
+  matched_count: number
+  candidate_count: number
+  queued_campaign_id: string | null
+  error_code: string | null
+  error_message: string | null
+  started_at: string
+  completed_at: string | null
+}
+
+export interface AutomationCandidate {
+  id: string
+  company_id: string
+  automation_rule_id: string
+  automation_run_id: string
+  contact_id: string
+  phone: string
+  message: string
+  scheduled_for: string
+  scheduled_date: string
+  status: "pending" | "approved" | "rejected" | "queued" | "skipped"
+  skip_reason: string | null
+  campaign_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface CsvContactRow {
   first_name: string
   last_name?: string
