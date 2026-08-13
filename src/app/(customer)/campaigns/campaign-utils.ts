@@ -1,5 +1,5 @@
 import { calculateSmsSegments } from "@/lib/sms-segments"
-import type { SmsCampaign } from "@/types"
+import type { SmsCampaign, SmsMessage } from "@/types"
 
 export type CampaignStatusFilter = "all" | SmsCampaign["status"]
 export type DlrFilter = "all" | "awaiting" | "checked" | "completed" | "none"
@@ -104,4 +104,17 @@ export function campaignReuseHref(campaign: SmsCampaign) {
   if (campaign.group_id) params.set("group", campaign.group_id)
 
   return `/sms?${params.toString()}`
+}
+
+export function messageStatusLabel(status: SmsMessage["status"]) {
+  if (status === "delivered") return "Teslim edildi"
+  if (status === "sent") return "Gönderildi"
+  if (status === "failed") return "Hata"
+  return "Bekliyor"
+}
+
+export function messageStatusTone(status: SmsMessage["status"]) {
+  if (status === "delivered" || status === "sent") return "success" as const
+  if (status === "failed") return "danger" as const
+  return "warning" as const
 }
